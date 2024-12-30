@@ -1,0 +1,22 @@
+# Build directory
+build/
+
+# macOS system files
+.DS_Store
+
+# Object files
+*.o
+
+# Dynamic libraries
+*.dylib
+
+# Package installers
+*.pkg
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+
+# Version tracking
+!releases
