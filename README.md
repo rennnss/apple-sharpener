@@ -23,7 +23,6 @@ A macOS tweak that programmatically removes window corner radius to achieve clea
 The following security features must be disabled for Ammonia injection to work:
 
 - System Integrity Protection (SIP)
-- Authenticated Root
 - Library Validation
 
 To disable these features, you'll need to:
@@ -34,7 +33,6 @@ To disable these features, you'll need to:
 2. Open Terminal (from Utilities menu) and run:
    ```bash
    csrutil disable
-   csrutil authenticated-root disable
    ```
 3. Restart your Mac:
 4. After restart, run in Terminal:
