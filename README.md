@@ -4,6 +4,8 @@ A macOS tweak that programmatically removes window corner radius to achieve clea
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
+![preview](./preview.png)
+
 ## Features
 
 - Removes rounded corners from application windows
