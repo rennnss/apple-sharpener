@@ -15,7 +15,7 @@ A macOS tweak that programmatically removes window corner radius to achieve clea
 
 ## Requirements
 
-- macOS Ventura or later
+- macOS Ventura or later (tested on Sonoma and Sequoia), though it probably works on 10.15 +
 - [Ammonia](https://github.com/CoreBedtime/ammonia) injection system installed
 
 ### System Security Settings
@@ -69,7 +69,7 @@ To disable these features, you'll need to:
 
 ## Troubleshooting
 Did you disable SIP?
-Did you follow this [readme](./README.md) carefully?
+Did you follow this [readme](./README.md#requirements) carefully?
 
 ## How It Works
 
