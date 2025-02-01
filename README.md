@@ -47,7 +47,8 @@ To disable these features, you'll need to:
 ## Installation
 
 ### Pre-built Release
-Download the latest release from the [releases page](../../releases).
+1. You can find the latest pre-built release Ammonia package from [Ammonia Injector releases page](https://github.com/CoreBedtime/ammonia/releases).
+2. Download and install the latest Apple Sharpener release from the [Apple Sharpener releases page](../../releases).
 
 ### Building from Source
 
@@ -65,6 +66,10 @@ Download the latest release from the [releases page](../../releases).
    make
    sudo make install
    ```
+
+## Troubleshooting
+Did you disable SIP?
+Did you follow this [readme](./README.md) carefully?
 
 ## How It Works
 
