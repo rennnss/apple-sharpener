@@ -61,7 +61,7 @@ To disable these features, you'll need to:
 
 2. Then build and install Apple Sharpener:
    ```bash
-   git clone https://github.com/yourusername/apple-sharpener
+   git clone https://github.com/aspauldingcode/apple-sharpener
    cd apple-sharpener
    make
    sudo make install
