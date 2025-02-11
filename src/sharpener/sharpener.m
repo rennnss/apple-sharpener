@@ -25,10 +25,8 @@ void toggleSquareCorners(BOOL enable, NSInteger radius) {
     
     // Update all existing windows
     for (NSWindow *window in [NSApplication sharedApplication].windows) {
-        if (enable && !(window.styleMask & NSWindowStyleMaskFullScreen)) {
-            [(id)window setValue:@(customRadius) forKey:@"cornerRadius"];
-        } else if (window.styleMask & NSWindowStyleMaskFullScreen) {
-            [(id)window setValue:@(0) forKey:@"cornerRadius"]; // Always reset in fullscreen
+        if (window.styleMask & NSWindowStyleMaskFullScreen) {
+            [(id)window setValue:@(0) forKey:@"cornerRadius"];
         } else {
             [(id)window setValue:@(customRadius) forKey:@"cornerRadius"];
         }
@@ -42,6 +40,20 @@ void toggleSquareCorners(BOOL enable, NSInteger radius) {
  */
 ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
 @implementation AS_NSWindow_CornerRadius
+
+- (id)_cornerMask {
+    // Only modify windows that are titled (application windows)
+    if (customRadius == 0 && (self.styleMask & NSWindowStyleMaskTitled)) {
+        // Create a 1x1 white image for square corners
+        NSImage *squareCornerMask = [[NSImage alloc] initWithSize:NSMakeSize(1, 1)];
+        [squareCornerMask lockFocus];
+        [[NSColor whiteColor] set];
+        NSRectFill(NSMakeRect(0, 0, 1, 1));
+        [squareCornerMask unlockFocus];
+        return squareCornerMask;
+    }
+    return ZKOrig(id);
+}
 
 - (void)setFrame:(NSRect)frameRect display:(BOOL)flag {
     ZKOrig(void, frameRect, flag);
@@ -75,24 +87,19 @@ ZKSwizzleInterface(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView)
 - (void)viewDidMoveToWindow {
     ZKOrig(void);
     
-    // Only apply radius if window exists and is not in fullscreen
-    if (self.window) {
-        if (self.window.styleMask & NSWindowStyleMaskFullScreen) {
-            [(id)self.window setValue:@(0) forKey:@"cornerRadius"];
-        } else if (enableCustomRadius && (self.window.styleMask & NSWindowStyleMaskTitled)) {
-            [(id)self.window setValue:@(customRadius) forKey:@"cornerRadius"];
-        }
-        [self.window invalidateShadow];
+    // Only hide decoration for windows that are titled (application windows)
+    if (customRadius == 0 && self.window && (self.window.styleMask & NSWindowStyleMaskTitled)) {
+        self.hidden = YES;  // Hide the decoration view entirely
     }
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
-    // Ensure corners are reset during fullscreen
-    if (self.window.styleMask & NSWindowStyleMaskFullScreen) {
-        [(id)self.window setValue:@(0) forKey:@"cornerRadius"];
+    // Only prevent drawing for titled windows with radius 0
+    if (customRadius == 0 && self.window.styleMask & NSWindowStyleMaskTitled) {
+        return;  // No-op to prevent any drawing
     }
     
-    ZKOrig(void, dirtyRect);
+    ZKOrig(void);
 }
 
 @end
