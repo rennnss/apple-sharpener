@@ -37,7 +37,12 @@ void printUsage() {
 @implementation StatusHandler
 + (void)handleStatus:(NSNotification *)notification {
     BOOL enabled = [notification.userInfo[@"enabled"] boolValue];
-    printf("Sharpener is now %s\n", enabled ? "enabled" : "disabled");
+    NSNumber *radius = notification.userInfo[@"radius"];
+    if (radius) {
+        printf("Sharpener is now %s with radius %.1f\n", enabled ? "enabled" : "disabled", [radius floatValue]);
+    } else {
+        printf("Sharpener is now %s\n", enabled ? "enabled" : "disabled");
+    }
     exit(0);
 }
 @end
@@ -90,11 +95,22 @@ int main(int argc, const char * argv[]) {
         if (hasRadius) {
             NSLog(@"Setting radius to: %.1f", radius);
             [[NSDistributedNotificationCenter defaultCenter] 
+                addObserver:[StatusHandler class]
+                selector:@selector(handleStatus:)
+                name:@"com.aspauldingcode.apple_sharpener.status"
+                object:nil
+                suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
+                
+            [[NSDistributedNotificationCenter defaultCenter] 
                 postNotificationName:@"com.aspauldingcode.apple_sharpener.set_radius"
                 object:nil
-                userInfo:@{@"radius": @(radius)}];
-            printf("Radius set to %.1f\n", radius);
-            return 0;
+                userInfo:@{@"radius": @(radius)}
+                deliverImmediately:YES];
+                
+            NSLog(@"Waiting for response...");
+            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:2.0]];
+            printf("No response received\n");
+            return 1;
         }
 
         // Handle on/off/toggle commands

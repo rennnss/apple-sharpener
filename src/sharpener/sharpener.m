@@ -103,3 +103,83 @@ ZKSwizzleInterface(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView)
 }
 
 @end
+
+// ------------------------------------------------------------------------
+// New distributed notification observer registration so the CLI tool
+// can instruct this tweak to toggle, enable, disable, or set the radius.
+// ------------------------------------------------------------------------
+
+__attribute__((constructor))
+static void initializeSharpenerDistributedNotificationHandler() {
+    NSDistributedNotificationCenter *dc = [NSDistributedNotificationCenter defaultCenter];
+    __weak NSDistributedNotificationCenter *weakDC = dc; // Use a weak reference to avoid retain cycles
+
+    [dc addObserverForName:@"com.aspauldingcode.apple_sharpener.enable"
+                      object:nil
+                       queue:[NSOperationQueue mainQueue]
+                  usingBlock:^(NSNotification * _Nonnull note) {
+        (void)note; // silence unused parameter warning
+        NSLog(@"Received enable notification");
+        toggleSquareCorners(YES, customRadius);
+        [weakDC postNotificationName:@"com.aspauldingcode.apple_sharpener.status"
+                                object:nil
+                              userInfo:@{@"enabled": @(YES), @"radius": @(customRadius)}
+                    deliverImmediately:YES];
+    }];
+
+    [dc addObserverForName:@"com.aspauldingcode.apple_sharpener.disable"
+                      object:nil
+                       queue:[NSOperationQueue mainQueue]
+                  usingBlock:^(NSNotification * _Nonnull note) {
+        (void)note;
+        NSLog(@"Received disable notification");
+        toggleSquareCorners(NO, customRadius);
+        [weakDC postNotificationName:@"com.aspauldingcode.apple_sharpener.status"
+                                object:nil
+                              userInfo:@{@"enabled": @(NO), @"radius": @(customRadius)}
+                    deliverImmediately:YES];
+    }];
+
+    [dc addObserverForName:@"com.aspauldingcode.apple_sharpener.toggle"
+                      object:nil
+                       queue:[NSOperationQueue mainQueue]
+                  usingBlock:^(NSNotification * _Nonnull note) {
+        (void)note;
+        NSLog(@"Received toggle notification");
+        BOOL newState = !enableCustomRadius;
+        toggleSquareCorners(newState, customRadius);
+        [weakDC postNotificationName:@"com.aspauldingcode.apple_sharpener.status"
+                                object:nil
+                              userInfo:@{@"enabled": @(newState), @"radius": @(customRadius)}
+                    deliverImmediately:YES];
+    }];
+
+    [dc addObserverForName:@"com.aspauldingcode.apple_sharpener.set_radius"
+                      object:nil
+                       queue:[NSOperationQueue mainQueue]
+                  usingBlock:^(NSNotification * _Nonnull note) {
+        (void)note;
+        NSNumber *radiusNumber = note.userInfo[@"radius"];
+        if (radiusNumber) {
+            NSInteger newRadius = [radiusNumber integerValue];
+            NSLog(@"Received set_radius notification: %ld", (long)newRadius);
+            toggleSquareCorners(enableCustomRadius, newRadius);
+            [weakDC postNotificationName:@"com.aspauldingcode.apple_sharpener.status"
+                                    object:nil
+                                  userInfo:@{@"enabled": @(enableCustomRadius), @"radius": @(customRadius)}
+                        deliverImmediately:YES];
+        }
+    }];
+
+    [dc addObserverForName:@"com.aspauldingcode.apple_sharpener.get_radius"
+                      object:nil
+                       queue:[NSOperationQueue mainQueue]
+                  usingBlock:^(NSNotification * _Nonnull note) {
+        (void)note;
+        NSLog(@"Received get_radius notification");
+        [weakDC postNotificationName:@"com.aspauldingcode.apple_sharpener.radius_response"
+                                object:nil
+                              userInfo:@{@"radius": @(customRadius)}
+                    deliverImmediately:YES];
+    }];
+}
