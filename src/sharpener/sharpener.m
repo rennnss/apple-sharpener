@@ -10,8 +10,9 @@
 
 // Global flag to control whether the custom radius is applied,
 // and the radius value to use when enabled.
+static BOOL enableSharpener = YES;
 static BOOL enableCustomRadius = YES;
-static NSInteger customRadius = 40;
+static NSInteger customRadius = 0;
 
 /**
  * Configures the custom window radius feature.
@@ -20,8 +21,8 @@ static NSInteger customRadius = 40;
  * @param radius The corner radius to apply when enabled
  */
 void toggleSquareCorners(BOOL enable, NSInteger radius) {
-    enableCustomRadius = enable;
-    customRadius = MAX(0, radius); // Ensure radius is not negative
+    enableSharpener = enable;  // Set the main enable flag
+    customRadius = MAX(0, radius); // Preserve radius setting
     
     // Update all existing windows
     for (NSWindow *window in [NSApplication sharedApplication].windows) {
@@ -34,8 +35,11 @@ void toggleSquareCorners(BOOL enable, NSInteger radius) {
         
         if (window.styleMask & NSWindowStyleMaskFullScreen) {
             [(id)window setValue:@(0) forKey:@"cornerRadius"];
-        } else {
+        } else if (enable) {
             [(id)window setValue:@(customRadius) forKey:@"cornerRadius"];
+        } else {
+            // Restore default corner radius when disabling
+            [(id)window setValue:@(10) forKey:@"cornerRadius"]; // macOS default is 10
         }
         [window invalidateShadow];
         [window.contentView setNeedsDisplay:YES];
@@ -49,6 +53,8 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
 @implementation AS_NSWindow_CornerRadius
 
 - (id)_cornerMask {
+    if (!enableSharpener) return ZKOrig(id);
+    
     // Only modify standard application windows
     if (customRadius == 0 && 
         (self.styleMask & NSWindowStyleMaskTitled) && 
@@ -67,6 +73,8 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
 
 - (void)setFrame:(NSRect)frameRect display:(BOOL)flag {
     ZKOrig(void, frameRect, flag);
+    
+    if (!enableSharpener) return;
     
     // Only modify standard application windows
     if (!(self.styleMask & NSWindowStyleMaskTitled) ||
@@ -104,6 +112,8 @@ ZKSwizzleInterface(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView)
 - (void)viewDidMoveToWindow {
     ZKOrig(void);
     
+    if (!enableSharpener) return;
+    
     // Only hide decoration for standard application windows
     if (customRadius == 0 && 
         self.window && 
@@ -115,6 +125,11 @@ ZKSwizzleInterface(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView)
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
+    if (!enableSharpener) {
+        ZKOrig(void, dirtyRect);
+        return;
+    }
+    
     // Only prevent drawing for standard application windows
     if (customRadius == 0 && 
         (self.window.styleMask & NSWindowStyleMaskTitled) &&
@@ -123,7 +138,7 @@ ZKSwizzleInterface(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView)
         return;  // No-op to prevent any drawing
     }
     
-    ZKOrig(void);
+    ZKOrig(void, dirtyRect);
 }
 
 @end
@@ -135,6 +150,8 @@ ZKSwizzleInterface(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView)
 
 __attribute__((constructor))
 static void initializeSharpenerDistributedNotificationHandler() {
+    if (!enableSharpener) return;
+    
     NSDistributedNotificationCenter *dc = [NSDistributedNotificationCenter defaultCenter];
     __weak NSDistributedNotificationCenter *weakDC = dc; // Use a weak reference to avoid retain cycles
 
@@ -142,6 +159,7 @@ static void initializeSharpenerDistributedNotificationHandler() {
                       object:nil
                        queue:[NSOperationQueue mainQueue]
                   usingBlock:^(NSNotification * _Nonnull note) {
+        if (!enableSharpener) return;
         (void)note; // silence unused parameter warning
         NSLog(@"Received enable notification");
         toggleSquareCorners(YES, customRadius);
@@ -155,6 +173,7 @@ static void initializeSharpenerDistributedNotificationHandler() {
                       object:nil
                        queue:[NSOperationQueue mainQueue]
                   usingBlock:^(NSNotification * _Nonnull note) {
+        if (!enableSharpener) return;
         (void)note;
         NSLog(@"Received disable notification");
         toggleSquareCorners(NO, customRadius);
@@ -168,6 +187,7 @@ static void initializeSharpenerDistributedNotificationHandler() {
                       object:nil
                        queue:[NSOperationQueue mainQueue]
                   usingBlock:^(NSNotification * _Nonnull note) {
+        if (!enableSharpener) return;
         (void)note;
         NSLog(@"Received toggle notification");
         BOOL newState = !enableCustomRadius;
@@ -182,6 +202,7 @@ static void initializeSharpenerDistributedNotificationHandler() {
                       object:nil
                        queue:[NSOperationQueue mainQueue]
                   usingBlock:^(NSNotification * _Nonnull note) {
+        if (!enableSharpener) return;
         (void)note;
         NSNumber *radiusNumber = note.userInfo[@"radius"];
         if (radiusNumber) {
@@ -199,6 +220,7 @@ static void initializeSharpenerDistributedNotificationHandler() {
                       object:nil
                        queue:[NSOperationQueue mainQueue]
                   usingBlock:^(NSNotification * _Nonnull note) {
+        if (!enableSharpener) return;
         (void)note;
         NSLog(@"Received get_radius notification");
         [weakDC postNotificationName:@"com.aspauldingcode.apple_sharpener.radius_response"

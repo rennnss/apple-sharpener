@@ -38,6 +38,7 @@ void printUsage() {
 + (void)handleStatus:(NSNotification *)notification {
     BOOL enabled = [notification.userInfo[@"enabled"] boolValue];
     NSNumber *radius = notification.userInfo[@"radius"];
+    
     if (radius) {
         printf("Sharpener is now %s with radius %.1f\n", enabled ? "enabled" : "disabled", [radius floatValue]);
     } else {
@@ -93,7 +94,6 @@ int main(int argc, const char * argv[]) {
         }
 
         if (hasRadius) {
-            NSLog(@"Setting radius to: %.1f", radius);
             [[NSDistributedNotificationCenter defaultCenter] 
                 addObserver:[StatusHandler class]
                 selector:@selector(handleStatus:)
@@ -107,35 +107,22 @@ int main(int argc, const char * argv[]) {
                 userInfo:@{@"radius": @(radius)}
                 deliverImmediately:YES];
                 
-            NSLog(@"Waiting for response...");
-            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:2.0]];
+            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1.0]];
             printf("No response received\n");
             return 1;
         }
 
         // Handle on/off/toggle commands
+        NSString *notificationName = nil;
         if ([firstArg isEqualToString:@"on"]) {
-            NSLog(@"Sending enable notification");
-            [[NSDistributedNotificationCenter defaultCenter] 
-                addObserver:[StatusHandler class]
-                selector:@selector(handleStatus:)
-                name:@"com.aspauldingcode.apple_sharpener.status"
-                object:nil
-                suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
-                
-            [[NSDistributedNotificationCenter defaultCenter] 
-                postNotificationName:@"com.aspauldingcode.apple_sharpener.enable"
-                object:nil
-                userInfo:nil
-                deliverImmediately:YES];
-                
-            NSLog(@"Waiting for response...");
-            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:2.0]];
-            NSLog(@"No response received");
-            printf("No response received\n");
-            return 1;
+            notificationName = @"com.aspauldingcode.apple_sharpener.enable";
         } else if ([firstArg isEqualToString:@"off"]) {
-            NSLog(@"Sending disable notification");
+            notificationName = @"com.aspauldingcode.apple_sharpener.disable";
+        } else if ([firstArg isEqualToString:@"toggle"]) {
+            notificationName = @"com.aspauldingcode.apple_sharpener.toggle";
+        }
+
+        if (notificationName) {
             [[NSDistributedNotificationCenter defaultCenter] 
                 addObserver:[StatusHandler class]
                 selector:@selector(handleStatus:)
@@ -144,32 +131,12 @@ int main(int argc, const char * argv[]) {
                 suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
                 
             [[NSDistributedNotificationCenter defaultCenter] 
-                postNotificationName:@"com.aspauldingcode.apple_sharpener.disable"
+                postNotificationName:notificationName
                 object:nil
                 userInfo:nil
                 deliverImmediately:YES];
                 
-            NSLog(@"Waiting for response...");
-            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:2.0]];
-            NSLog(@"No response received");
-            printf("No response received\n");
-            return 1;
-        } else if ([firstArg isEqualToString:@"toggle"]) {
-            [[NSDistributedNotificationCenter defaultCenter] 
-                addObserver:[StatusHandler class]
-                selector:@selector(handleStatus:)
-                name:@"com.aspauldingcode.apple_sharpener.status"
-                object:nil
-                suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
-                
-            NSDictionary *userInfo = nil;
-            [[NSDistributedNotificationCenter defaultCenter] 
-                postNotificationName:@"com.aspauldingcode.apple_sharpener.toggle"
-                object:nil
-                userInfo:userInfo
-                deliverImmediately:YES];
-                
-            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:2.0]];
+            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1.0]];
             printf("No response received\n");
             return 1;
         } else {
