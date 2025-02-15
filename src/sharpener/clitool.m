@@ -25,7 +25,12 @@ void printUsage() {
 @implementation RadiusResponseHandler
 + (void)handleRadiusResponse:(NSNotification *)notification {
     float radius = [notification.userInfo[@"radius"] floatValue];
-    printf("Current radius: %.1f\n", radius);
+    
+    if (radius == 0.0) {
+        printf("Current radius: default 0.0\n");
+    } else {
+        printf("Current radius: %.1f\n", radius);
+    }
     exit(0);
 }
 @end
@@ -37,12 +42,13 @@ void printUsage() {
 @implementation StatusHandler
 + (void)handleStatus:(NSNotification *)notification {
     BOOL enabled = [notification.userInfo[@"enabled"] boolValue];
-    NSNumber *radius = notification.userInfo[@"radius"];
+    NSNumber *radiusNumber = notification.userInfo[@"radius"];
+    float radius = [radiusNumber floatValue];
     
-    if (radius) {
-        printf("Sharpener is now %s with radius %.1f\n", enabled ? "enabled" : "disabled", [radius floatValue]);
+    if (radius == 0.0) {
+        printf("Sharpener is now %s with default radius 0.0\n", enabled ? "enabled" : "disabled");
     } else {
-        printf("Sharpener is now %s\n", enabled ? "enabled" : "disabled");
+        printf("Sharpener is now %s with radius %.1f\n", enabled ? "enabled" : "disabled", radius);
     }
     exit(0);
 }

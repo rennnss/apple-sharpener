@@ -8,8 +8,7 @@
  * When disabled, the original system behavior is used.
  */
 
-// Global flag to control whether the custom radius is applied,
-// and the radius value to use when enabled.
+// Global flags and default radius value
 static BOOL enableSharpener = YES;
 static BOOL enableCustomRadius = YES;
 static NSInteger customRadius = 0;
@@ -155,102 +154,96 @@ ZKSwizzleInterface(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView)
 
 __attribute__((constructor))
 static void initializeSharpenerDistributedNotificationHandler() {
-    if (!enableSharpener) return;
+    // Reset state on load
+    customRadius = 0;
+    enableSharpener = YES;
+    enableCustomRadius = YES;
     
     NSDistributedNotificationCenter *dc = [NSDistributedNotificationCenter defaultCenter];
-    __weak NSDistributedNotificationCenter *weakDC = dc; // Use a weak reference to avoid retain cycles
+    __weak NSDistributedNotificationCenter *weakDC = dc; // avoid retain cycles
 
     [dc addObserverForName:@"com.aspauldingcode.apple_sharpener.enable"
                       object:nil
                        queue:[NSOperationQueue mainQueue]
-                  usingBlock:^(NSNotification * _Nonnull note) {
-        if (!enableSharpener) return;
-        (void)note;
+                  usingBlock:^(NSNotification * _Nonnull note __unused) {
         NSLog(@"Received enable notification");
-        enableCustomRadius = YES;  // Make sure custom radius is enabled
-        
-        // Update all existing windows
+        enableCustomRadius = YES;
+    
+        // Force update all open windows by nudging their frame.
         for (NSWindow *window in [NSApplication sharedApplication].windows) {
-            if (!(window.styleMask & NSWindowStyleMaskTitled) || 
+            if (!(window.styleMask & NSWindowStyleMaskTitled) ||
                 (window.styleMask & NSWindowStyleMaskHUDWindow) ||
-                (window.styleMask & NSWindowStyleMaskUtilityWindow)) {
+                (window.styleMask & NSWindowStyleMaskUtilityWindow))
+            {
                 continue;
             }
             
-            // Force a frame update to trigger our swizzled method
-            NSRect frame = window.frame;
-            [window setFrame:frame display:YES];
+            NSRect originalFrame = window.frame;
+            NSRect tempFrame = NSInsetRect(originalFrame, 0.5, 0.5);
+            [window setFrame:tempFrame display:YES];
+            [window setFrame:originalFrame display:YES];
             
-            // Also update the titlebar decoration view
             NSView *titlebarView = [window valueForKey:@"_titlebarDecorationView"];
             [titlebarView setNeedsDisplay:YES];
         }
-        
+    
+        // Reapply the custom radius to all windows.
         toggleSquareCorners(YES, customRadius);
-        
         [weakDC postNotificationName:@"com.aspauldingcode.apple_sharpener.status"
-                            object:nil
-                          userInfo:@{@"enabled": @(YES), @"radius": @(customRadius)}
-                deliverImmediately:YES];
+                               object:nil
+                             userInfo:@{@"enabled": @(YES), @"radius": @(customRadius)}
+                 deliverImmediately:YES];
     }];
 
     [dc addObserverForName:@"com.aspauldingcode.apple_sharpener.disable"
                       object:nil
                        queue:[NSOperationQueue mainQueue]
-                  usingBlock:^(NSNotification * _Nonnull note) {
-        if (!enableSharpener) return;
-        (void)note;
+                  usingBlock:^(NSNotification * _Nonnull note __unused) {
         NSLog(@"Received disable notification");
         toggleSquareCorners(NO, customRadius);
         [weakDC postNotificationName:@"com.aspauldingcode.apple_sharpener.status"
-                                object:nil
-                              userInfo:@{@"enabled": @(NO), @"radius": @(customRadius)}
-                    deliverImmediately:YES];
+                               object:nil
+                             userInfo:@{@"enabled": @(NO), @"radius": @(customRadius)}
+                 deliverImmediately:YES];
     }];
 
     [dc addObserverForName:@"com.aspauldingcode.apple_sharpener.toggle"
                       object:nil
                        queue:[NSOperationQueue mainQueue]
-                  usingBlock:^(NSNotification * _Nonnull note) {
-        if (!enableSharpener) return;
-        (void)note;
+                  usingBlock:^(NSNotification * _Nonnull note __unused) {
         NSLog(@"Received toggle notification");
-        enableCustomRadius = !enableCustomRadius;  // Toggle the state
-        toggleSquareCorners(enableCustomRadius, customRadius);  // Apply the change
+        enableCustomRadius = !enableCustomRadius;
+        toggleSquareCorners(enableCustomRadius, customRadius);
         [weakDC postNotificationName:@"com.aspauldingcode.apple_sharpener.status"
-                                object:nil
-                              userInfo:@{@"enabled": @(enableCustomRadius), @"radius": @(customRadius)}
-                    deliverImmediately:YES];
+                               object:nil
+                             userInfo:@{@"enabled": @(enableCustomRadius), @"radius": @(customRadius)}
+                 deliverImmediately:YES];
     }];
 
     [dc addObserverForName:@"com.aspauldingcode.apple_sharpener.set_radius"
                       object:nil
                        queue:[NSOperationQueue mainQueue]
-                  usingBlock:^(NSNotification * _Nonnull note) {
-        if (!enableSharpener) return;
-        (void)note;
+                  usingBlock:^(NSNotification * _Nonnull note __unused) {
         NSNumber *radiusNumber = note.userInfo[@"radius"];
         if (radiusNumber) {
             NSInteger newRadius = [radiusNumber integerValue];
             NSLog(@"Received set_radius notification: %ld", (long)newRadius);
             toggleSquareCorners(enableCustomRadius, newRadius);
             [weakDC postNotificationName:@"com.aspauldingcode.apple_sharpener.status"
-                                    object:nil
-                                  userInfo:@{@"enabled": @(enableCustomRadius), @"radius": @(customRadius)}
-                        deliverImmediately:YES];
+                                   object:nil
+                                 userInfo:@{@"enabled": @(enableCustomRadius), @"radius": @(customRadius)}
+                     deliverImmediately:YES];
         }
     }];
 
     [dc addObserverForName:@"com.aspauldingcode.apple_sharpener.get_radius"
                       object:nil
                        queue:[NSOperationQueue mainQueue]
-                  usingBlock:^(NSNotification * _Nonnull note) {
-        if (!enableSharpener) return;
-        (void)note;
+                  usingBlock:^(NSNotification * _Nonnull note __unused) {
         NSLog(@"Received get_radius notification");
         [weakDC postNotificationName:@"com.aspauldingcode.apple_sharpener.radius_response"
-                                object:nil
-                              userInfo:@{@"radius": @(customRadius)}
-                    deliverImmediately:YES];
+                               object:nil
+                             userInfo:@{@"radius": @(customRadius)}
+                 deliverImmediately:YES];
     }];
 }
