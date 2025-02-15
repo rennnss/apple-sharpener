@@ -1,58 +1,22 @@
 #import <Foundation/Foundation.h>
+#import <notify.h>
 
 void printUsage() {
-    printf("Usage: sharpener [command] [options]\n\n");
-    printf("Commands:\n");
-    printf("  on             Enable window sharpening\n");
-    printf("  off            Disable window sharpening\n");
-    printf("  toggle         Toggle window sharpening\n");
-    printf("\nOptions:\n");
-    printf("  --radius=<value>, -r <value>  Set the sharpening radius\n");
-    printf("  --show-radius, -s             Show current radius setting\n");
-    printf("  --help, -h                    Show this help message\n");
-    printf("\nExamples:\n");
-    printf("  sharpener --radius=40         Set radius to 40\n");
-    printf("  sharpener -r 40               Set radius to 40\n");
-    printf("  sharpener on                  Enable sharpening\n");
-    printf("  sharpener off                 Disable sharpening\n");
-    printf("  sharpener -s                  Show current radius\n");
+    puts("Usage: sharpener [command] [options]\n"
+         "\nCommands:"
+         "\n  on             Enable window sharpening"
+         "\n  off            Disable window sharpening"
+         "\n  toggle         Toggle window sharpening"
+         "\n\nOptions:"
+         "\n  --radius=<value>, -r <value>  Set the sharpening radius"
+         "\n  --show-radius, -s             Query current radius setting"
+         "\n  --help, -h                    Show this help message"
+         "\n\nExamples:"
+         "\n  sharpener --radius=40         Set radius to 40"
+         "\n  sharpener -r 40               Set radius to 40"
+         "\n  sharpener on                  Enable sharpening"
+         "\n  sharpener -s                  Query current radius");
 }
-
-@interface RadiusResponseHandler : NSObject
-+ (void)handleRadiusResponse:(NSNotification *)notification;
-@end
-
-@implementation RadiusResponseHandler
-+ (void)handleRadiusResponse:(NSNotification *)notification {
-    float radius = [notification.userInfo[@"radius"] floatValue];
-    
-    if (radius == 0.0) {
-        printf("Current radius: default 0.0\n");
-    } else {
-        printf("Current radius: %.1f\n", radius);
-    }
-    exit(0);
-}
-@end
-
-@interface StatusHandler : NSObject
-+ (void)handleStatus:(NSNotification *)notification;
-@end
-
-@implementation StatusHandler
-+ (void)handleStatus:(NSNotification *)notification {
-    BOOL enabled = [notification.userInfo[@"enabled"] boolValue];
-    NSNumber *radiusNumber = notification.userInfo[@"radius"];
-    float radius = [radiusNumber floatValue];
-    
-    if (radius == 0.0) {
-        printf("Sharpener is now %s with default radius 0.0\n", enabled ? "enabled" : "disabled");
-    } else {
-        printf("Sharpener is now %s with radius %.1f\n", enabled ? "enabled" : "disabled", radius);
-    }
-    exit(0);
-}
-@end
 
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
@@ -60,91 +24,44 @@ int main(int argc, const char * argv[]) {
             printUsage();
             return 1;
         }
-
+        
         NSString *firstArg = [NSString stringWithUTF8String:argv[1]];
         
-        // Handle help
         if ([firstArg isEqualToString:@"--help"] || [firstArg isEqualToString:@"-h"]) {
             printUsage();
             return 0;
         }
         
-        // Handle show radius
-        if ([firstArg isEqualToString:@"--show-radius"] || [firstArg isEqualToString:@"-s"]) {
-            [[NSDistributedNotificationCenter defaultCenter] 
-                addObserver:[RadiusResponseHandler class]
-                selector:@selector(handleRadiusResponse:)
-                name:@"com.aspauldingcode.apple_sharpener.radius_response"
-                object:nil];
-                
-            [[NSDistributedNotificationCenter defaultCenter] 
-                postNotificationName:@"com.aspauldingcode.apple_sharpener.get_radius"
-                object:nil
-                userInfo:nil];
-                
-            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1.0]];
-            printf("No response received\n");
-            return 1;
-        }
-
-        // Handle radius setting
-        float radius = 0.0;
-        BOOL hasRadius = NO;
-        
-        if ([firstArg hasPrefix:@"--radius="]) {
-            radius = [[firstArg substringFromIndex:9] floatValue];
-            hasRadius = YES;
-        } else if ([firstArg isEqualToString:@"-r"] && argc > 2) {
-            radius = [[NSString stringWithUTF8String:argv[2]] floatValue];
-            hasRadius = YES;
-        }
-
-        if (hasRadius) {
-            [[NSDistributedNotificationCenter defaultCenter] 
-                addObserver:[StatusHandler class]
-                selector:@selector(handleStatus:)
-                name:@"com.aspauldingcode.apple_sharpener.status"
-                object:nil
-                suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
-                
-            [[NSDistributedNotificationCenter defaultCenter] 
-                postNotificationName:@"com.aspauldingcode.apple_sharpener.set_radius"
-                object:nil
-                userInfo:@{@"radius": @(radius)}
-                deliverImmediately:YES];
-                
-            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1.0]];
-            printf("No response received\n");
-            return 1;
-        }
-
-        // Handle on/off/toggle commands
-        NSString *notificationName = nil;
         if ([firstArg isEqualToString:@"on"]) {
-            notificationName = @"com.aspauldingcode.apple_sharpener.enable";
+            notify_post("com.aspauldingcode.apple_sharpener.enable");
+            printf("Sharpener enabled\n");
         } else if ([firstArg isEqualToString:@"off"]) {
-            notificationName = @"com.aspauldingcode.apple_sharpener.disable";
+            notify_post("com.aspauldingcode.apple_sharpener.disable");
+            printf("Sharpener disabled\n");
         } else if ([firstArg isEqualToString:@"toggle"]) {
-            notificationName = @"com.aspauldingcode.apple_sharpener.toggle";
-        }
-
-        if (notificationName) {
-            [[NSDistributedNotificationCenter defaultCenter] 
-                addObserver:[StatusHandler class]
-                selector:@selector(handleStatus:)
-                name:@"com.aspauldingcode.apple_sharpener.status"
-                object:nil
-                suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
-                
-            [[NSDistributedNotificationCenter defaultCenter] 
-                postNotificationName:notificationName
-                object:nil
-                userInfo:nil
-                deliverImmediately:YES];
-                
-            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1.0]];
-            printf("No response received\n");
-            return 1;
+            notify_post("com.aspauldingcode.apple_sharpener.toggle");
+            printf("Sharpener toggled\n");
+        } else if ([firstArg hasPrefix:@"--radius="] || ([firstArg isEqualToString:@"-r"] && argc > 2)) {
+            uint64_t radius = 0;
+            if ([firstArg hasPrefix:@"--radius="]) {
+                radius = strtoull([[firstArg substringFromIndex:9] UTF8String], NULL, 10);
+            } else {
+                radius = strtoull(argv[2], NULL, 10);
+            }
+            // Register for the set_radius notification to obtain a token.
+            int tokenSetRadius = 0;
+            if (notify_register_check("com.aspauldingcode.apple_sharpener.set_radius", &tokenSetRadius) == NOTIFY_STATUS_OK) {
+                // Set the state with the token and post the notification.
+                notify_set_state(tokenSetRadius, radius);
+                notify_post("com.aspauldingcode.apple_sharpener.set_radius");
+                printf("Sharpener radius set to %llu\n", radius);
+            } else {
+                printf("Failed to register set_radius notification\n");
+                return 1;
+            }
+        } else if ([firstArg isEqualToString:@"--show-radius"] || [firstArg isEqualToString:@"-s"]) {
+            notify_post("com.aspauldingcode.apple_sharpener.get_radius");
+            printf("Radius query sent\n");
         } else {
             printf("Unknown command: %s\n", [firstArg UTF8String]);
             printUsage();

@@ -74,22 +74,24 @@ $(BUILD_DIR)/$(DYLIB_NAME): $(DYLIB_OBJECTS)
 	$(PUBLIC_FRAMEWORKS) \
 	-L$(SDKROOT)/usr/lib
 
-# Build CLI tool
-$(BUILD_DIR)/$(CLI_NAME): $(CLI_SOURCE) $(BUILD_DIR)/$(DYLIB_NAME)
+# Build CLI tool (updated to avoid linking UI frameworks)
+$(BUILD_DIR)/$(CLI_NAME): $(CLI_SOURCE)
 	@rm -f $(BUILD_DIR)/$(CLI_NAME)
-	$(CC) $(CFLAGS) $(ARCHS) \
-	$(CLI_SOURCE) $(BUILD_DIR)/$(DYLIB_NAME) \
-	$(PUBLIC_FRAMEWORKS) \
-	-Wl,-rpath,$(INSTALL_DIR) \
-	-o $@
+	$(CC) $(CFLAGS) $(ARCHS) $(CLI_SOURCE) \
+		-framework Foundation \
+		-framework CoreFoundation \
+		-o $@
 
 # Install both dylib and CLI tool
 install: $(BUILD_DIR)/$(DYLIB_NAME) $(BUILD_DIR)/$(CLI_NAME)
-	@sudo mkdir -p $(INSTALL_DIR)
-	@sudo cp $(BUILD_DIR)/$(DYLIB_NAME) $(INSTALL_PATH)
-	@sudo chmod 755 $(INSTALL_PATH)
-	@sudo cp $(BUILD_DIR)/$(CLI_NAME) $(CLI_INSTALL_PATH)
-	@sudo chmod 755 $(CLI_INSTALL_PATH)
+	@echo "Installing dylib to $(INSTALL_DIR) and CLI tool to $(CLI_INSTALL_DIR)"
+	# Create the target directories.
+	mkdir -p $(INSTALL_DIR)
+	mkdir -p $(CLI_INSTALL_DIR)
+	# Install the tweak's dylib where injection takes place.
+	sudo install -m 755 $(BUILD_DIR)/$(DYLIB_NAME) $(INSTALL_DIR)
+	# Install the CLI tool separately so it will not have DYLD_INSERT_LIBRARIES set.
+	sudo install -m 755 $(BUILD_DIR)/$(CLI_NAME) $(CLI_INSTALL_DIR)
 	@if [ -f $(BLACKLIST_SOURCE) ]; then \
 		sudo cp $(BLACKLIST_SOURCE) $(BLACKLIST_DEST); \
 		sudo chmod 644 $(BLACKLIST_DEST); \
