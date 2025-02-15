@@ -25,6 +25,13 @@ void toggleSquareCorners(BOOL enable, NSInteger radius) {
     
     // Update all existing windows
     for (NSWindow *window in [NSApplication sharedApplication].windows) {
+        // Only modify standard application windows
+        if (!(window.styleMask & NSWindowStyleMaskTitled) || 
+            (window.styleMask & NSWindowStyleMaskHUDWindow) ||
+            (window.styleMask & NSWindowStyleMaskUtilityWindow)) {
+            continue;
+        }
+        
         if (window.styleMask & NSWindowStyleMaskFullScreen) {
             [(id)window setValue:@(0) forKey:@"cornerRadius"];
         } else {
@@ -42,8 +49,11 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
 @implementation AS_NSWindow_CornerRadius
 
 - (id)_cornerMask {
-    // Only modify windows that are titled (application windows)
-    if (customRadius == 0 && (self.styleMask & NSWindowStyleMaskTitled)) {
+    // Only modify standard application windows
+    if (customRadius == 0 && 
+        (self.styleMask & NSWindowStyleMaskTitled) && 
+        !(self.styleMask & NSWindowStyleMaskHUDWindow) &&
+        !(self.styleMask & NSWindowStyleMaskUtilityWindow)) {
         // Create a 1x1 white image for square corners
         NSImage *squareCornerMask = [[NSImage alloc] initWithSize:NSMakeSize(1, 1)];
         [squareCornerMask lockFocus];
@@ -58,11 +68,18 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
 - (void)setFrame:(NSRect)frameRect display:(BOOL)flag {
     ZKOrig(void, frameRect, flag);
     
+    // Only modify standard application windows
+    if (!(self.styleMask & NSWindowStyleMaskTitled) ||
+        (self.styleMask & NSWindowStyleMaskHUDWindow) ||
+        (self.styleMask & NSWindowStyleMaskUtilityWindow)) {
+        return;
+    }
+    
     // Apply appropriate radius after frame change
     if (self.styleMask & NSWindowStyleMaskFullScreen) {
         [(id)self setValue:@(0) forKey:@"cornerRadius"];
         [self invalidateShadow];
-    } else if (enableCustomRadius && (self.styleMask & NSWindowStyleMaskTitled)) {
+    } else if (enableCustomRadius) {
         [(id)self setValue:@(customRadius) forKey:@"cornerRadius"];
         [self invalidateShadow];
     }
@@ -87,15 +104,22 @@ ZKSwizzleInterface(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView)
 - (void)viewDidMoveToWindow {
     ZKOrig(void);
     
-    // Only hide decoration for windows that are titled (application windows)
-    if (customRadius == 0 && self.window && (self.window.styleMask & NSWindowStyleMaskTitled)) {
+    // Only hide decoration for standard application windows
+    if (customRadius == 0 && 
+        self.window && 
+        (self.window.styleMask & NSWindowStyleMaskTitled) &&
+        !(self.window.styleMask & NSWindowStyleMaskHUDWindow) &&
+        !(self.window.styleMask & NSWindowStyleMaskUtilityWindow)) {
         self.hidden = YES;  // Hide the decoration view entirely
     }
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
-    // Only prevent drawing for titled windows with radius 0
-    if (customRadius == 0 && self.window.styleMask & NSWindowStyleMaskTitled) {
+    // Only prevent drawing for standard application windows
+    if (customRadius == 0 && 
+        (self.window.styleMask & NSWindowStyleMaskTitled) &&
+        !(self.window.styleMask & NSWindowStyleMaskHUDWindow) &&
+        !(self.window.styleMask & NSWindowStyleMaskUtilityWindow)) {
         return;  // No-op to prevent any drawing
     }
     
