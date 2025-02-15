@@ -53,7 +53,7 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
 @implementation AS_NSWindow_CornerRadius
 
 - (id)_cornerMask {
-    if (!enableSharpener) return ZKOrig(id);
+    if (!enableSharpener || !enableCustomRadius) return ZKOrig(id);
     
     // Only modify standard application windows
     if (customRadius == 0 && 
@@ -74,7 +74,13 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
 - (void)setFrame:(NSRect)frameRect display:(BOOL)flag {
     ZKOrig(void, frameRect, flag);
     
-    if (!enableSharpener) return;
+    // Check both global enable state and custom radius state
+    if (!enableSharpener || !enableCustomRadius) {
+        // Ensure window has default radius when tweak is disabled
+        [(id)self setValue:@(10) forKey:@"cornerRadius"];
+        [self invalidateShadow];
+        return;
+    }
     
     // Only modify standard application windows
     if (!(self.styleMask & NSWindowStyleMaskTitled) ||
@@ -86,11 +92,10 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
     // Apply appropriate radius after frame change
     if (self.styleMask & NSWindowStyleMaskFullScreen) {
         [(id)self setValue:@(0) forKey:@"cornerRadius"];
-        [self invalidateShadow];
-    } else if (enableCustomRadius) {
+    } else {
         [(id)self setValue:@(customRadius) forKey:@"cornerRadius"];
-        [self invalidateShadow];
     }
+    [self invalidateShadow];
 }
 
 - (void)toggleFullScreen:(id)sender {
@@ -160,13 +165,33 @@ static void initializeSharpenerDistributedNotificationHandler() {
                        queue:[NSOperationQueue mainQueue]
                   usingBlock:^(NSNotification * _Nonnull note) {
         if (!enableSharpener) return;
-        (void)note; // silence unused parameter warning
+        (void)note;
         NSLog(@"Received enable notification");
+        enableCustomRadius = YES;  // Make sure custom radius is enabled
+        
+        // Update all existing windows
+        for (NSWindow *window in [NSApplication sharedApplication].windows) {
+            if (!(window.styleMask & NSWindowStyleMaskTitled) || 
+                (window.styleMask & NSWindowStyleMaskHUDWindow) ||
+                (window.styleMask & NSWindowStyleMaskUtilityWindow)) {
+                continue;
+            }
+            
+            // Force a frame update to trigger our swizzled method
+            NSRect frame = window.frame;
+            [window setFrame:frame display:YES];
+            
+            // Also update the titlebar decoration view
+            NSView *titlebarView = [window valueForKey:@"_titlebarDecorationView"];
+            [titlebarView setNeedsDisplay:YES];
+        }
+        
         toggleSquareCorners(YES, customRadius);
+        
         [weakDC postNotificationName:@"com.aspauldingcode.apple_sharpener.status"
-                                object:nil
-                              userInfo:@{@"enabled": @(YES), @"radius": @(customRadius)}
-                    deliverImmediately:YES];
+                            object:nil
+                          userInfo:@{@"enabled": @(YES), @"radius": @(customRadius)}
+                deliverImmediately:YES];
     }];
 
     [dc addObserverForName:@"com.aspauldingcode.apple_sharpener.disable"
@@ -190,11 +215,11 @@ static void initializeSharpenerDistributedNotificationHandler() {
         if (!enableSharpener) return;
         (void)note;
         NSLog(@"Received toggle notification");
-        BOOL newState = !enableCustomRadius;
-        toggleSquareCorners(newState, customRadius);
+        enableCustomRadius = !enableCustomRadius;  // Toggle the state
+        toggleSquareCorners(enableCustomRadius, customRadius);  // Apply the change
         [weakDC postNotificationName:@"com.aspauldingcode.apple_sharpener.status"
                                 object:nil
-                              userInfo:@{@"enabled": @(newState), @"radius": @(customRadius)}
+                              userInfo:@{@"enabled": @(enableCustomRadius), @"radius": @(customRadius)}
                     deliverImmediately:YES];
     }];
 
