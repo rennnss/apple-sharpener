@@ -6,6 +6,9 @@ A macOS tweak that programmatically removes window corner radius to achieve clea
 
 ![preview](./preview.png)
 
+# Video:
+[x.com/aspauldingcode/apple-sharpener](https://x.com/aspauldingcode/status/1889836621870318072)
+
 ## Features
 
 - Removes rounded corners from application windows
