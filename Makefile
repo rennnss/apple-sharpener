@@ -28,7 +28,7 @@ DYLIB_NAME = lib$(PROJECT).dylib
 CLI_NAME = sharpener
 BUILD_DIR = build
 SOURCE_DIR = src
-INSTALL_DIR = /usr/local/bin/ammonia/tweaks
+INSTALL_DIR = /var/ammonia/core/tweaks
 CLI_INSTALL_DIR = /usr/local/bin
 
 # Source files
@@ -86,8 +86,8 @@ $(BUILD_DIR)/$(CLI_NAME): $(CLI_SOURCE)
 install: $(BUILD_DIR)/$(DYLIB_NAME) $(BUILD_DIR)/$(CLI_NAME)
 	@echo "Installing dylib to $(INSTALL_DIR) and CLI tool to $(CLI_INSTALL_DIR)"
 	# Create the target directories.
-	mkdir -p $(INSTALL_DIR)
-	mkdir -p $(CLI_INSTALL_DIR)
+	sudo mkdir -p $(INSTALL_DIR)
+	sudo mkdir -p $(CLI_INSTALL_DIR)
 	# Install the tweak's dylib where injection takes place.
 	sudo install -m 755 $(BUILD_DIR)/$(DYLIB_NAME) $(INSTALL_DIR)
 	# Install the CLI tool separately so it will not have DYLD_INSERT_LIBRARIES set.
@@ -103,47 +103,18 @@ install: $(BUILD_DIR)/$(DYLIB_NAME) $(BUILD_DIR)/$(CLI_NAME)
 
 # Test target that builds, installs, and relaunches test applications
 test: install
-	@echo "Clearing previous logs..."
-	@sudo log erase --all
 	@echo "Force quitting test applications..."
-	@pkill -9 "Spotify" 2>/dev/null || true
-	@pkill -9 "System Settings" 2>/dev/null || true
-	@pkill -9 "Chess" 2>/dev/null || true
-	@pkill -9 "soffice" 2>/dev/null || true
-	@pkill -9 "Brave Browser" 2>/dev/null || true
-	@pkill -9 "Beeper" 2>/dev/null || true
-	@pkill -9 "Safari" 2>/dev/null || true
-	@pkill -9 "Finder" 2>/dev/null && sleep 2 && open -a "Finder" || true
-	@echo "Restarting ammonia injector..."
-	@sudo pkill -9 ammonia || true
-	@sleep 2
-	@sudo launchctl bootout system /Library/LaunchDaemons/com.bedtime.ammonia.plist 2>/dev/null || true
-	@sleep 2
-	@sudo launchctl bootstrap system /Library/LaunchDaemons/com.bedtime.ammonia.plist
-	@sleep 2
-	@echo "Ammonia injector restarted"
-	@echo "Waiting for system to stabilize..."
-	@sleep 5
-	@echo "Launching test applications..."
-	@open -a "Spotify" || echo "Failed to open Spotify"
-	@sleep 1
-	@open -a "System Settings" || echo "Failed to open System Settings"
-	@sleep 1
-	@open -a "Chess" || echo "Failed to open Chess"
-	@sleep 1
-	@open -a "LibreOffice" || echo "Failed to open LibreOffice"
-	@sleep 1
-	@open -a "Brave Browser" || echo "Failed to open Brave Browser"
-	@sleep 1
-	@open -a "Beeper" || echo "Failed to open Beeper"
-	@sleep 1
-	@open -a "Safari" || echo "Failed to open Safari"
-	@sleep 1
-	@echo "Test applications launched"
-	@echo "Checking logs..."
-	@log show --predicate 'subsystem == "com.aspauldingcode.$(PROJECT)"' --debug --last 5m > test_output.log || true
-	@echo "Checking log for specific entries..."
-	@grep "Loaded" test_output.log || echo "No relevant log entries found."
+	$(eval TEST_APPS := Spotify "System Settings" Chess soffice "Brave Browser" Beeper Safari Finder)
+	@for app in $(TEST_APPS); do \
+		pkill -9 "$$app" 2>/dev/null || true; \
+	done
+	@echo "Relaunching test applications..."
+	@for app in $(TEST_APPS); do \
+		if [ "$$app" != "soffice" ]; then \
+			open -a "$$app" 2>/dev/null || true; \
+		fi; \
+	done
+	@echo "Test applications restarted with new dylib loaded"
 
 # Clean build files
 clean:
@@ -153,14 +124,11 @@ clean:
 # Delete installed files
 delete:
 	@echo "Force quitting test applications..."
-	@pkill -9 "Spotify" 2>/dev/null || true
-	@pkill -9 "System Settings" 2>/dev/null || true
-	@pkill -9 "Chess" 2>/dev/null || true
-	@pkill -9 "soffice" 2>/dev/null || true
-	@pkill -9 "Brave Browser" 2>/dev/null || true
-	@pkill -9 "Beeper" 2>/dev/null || true
-	@pkill -9 "Safari" 2>/dev/null || true
-	@pkill -9 "Finder" 2>/dev/null && sleep 2 && open -a "Finder" || true
+	$(eval TEST_APPS := Spotify "System Settings" Chess soffice "Brave Browser" Beeper Safari Finder)
+	@for app in $(TEST_APPS); do \
+		pkill -9 "$$app" 2>/dev/null || true; \
+	done
+	@sleep 2 && open -a "Finder" || true
 	@sudo rm -f $(INSTALL_PATH)
 	@sudo rm -f $(CLI_INSTALL_PATH)
 	@sudo rm -f $(BLACKLIST_DEST)
@@ -173,4 +141,4 @@ uninstall:
 	@sudo rm -f $(BLACKLIST_DEST)
 	@echo "Uninstalled $(DYLIB_NAME), $(CLI_NAME), and blacklist"
 
-.PHONY: all clean install test delete uninstall 
+.PHONY: all clean install test delete uninstall
