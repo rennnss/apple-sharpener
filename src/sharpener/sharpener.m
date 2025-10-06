@@ -42,21 +42,20 @@ static void applyCornerRadiusToWindow(NSWindow *window) {
         [(id)window setValue:@(radius) forKey:@"cornerRadius"];
     } @catch (NSException *exception) {
         // Method 2: Try direct property access if available
-        if ([window respondsToSelector:@selector(setCornerRadius:)]) {
-            [window performSelector:@selector(setCornerRadius:) withObject:@(radius)];
+        //if ([window respondsToSelector:@selector(setCornerRadius:)]) {
+          //  [window performSelector:@selector(setCornerRadius:) withObject:@(radius)];
         }
-    }
     
     // Method 3: Try setting via layer if available
-    if (window.contentView.layer) {
-        window.contentView.layer.cornerRadius = radius;
-        window.contentView.layer.masksToBounds = (radius > 0);
-    }
+   // if (window.contentView.layer) {
+     //   window.contentView.layer.cornerRadius = radius;
+       // window.contentView.layer.masksToBounds = (radius > 0);
+    //}
     
     // Force window refresh
-    [window invalidateShadow];
-    [window.contentView setNeedsDisplay:YES];
-    [window displayIfNeeded];
+    //[window invalidateShadow];
+    //[window.contentView setNeedsDisplay:YES];
+    //[window displayIfNeeded];
 }
 
 #pragma mark - Tweak API
@@ -196,61 +195,61 @@ ZKSwizzleInterface(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView)
 // This avoids loading extra system agents.
 static int tokenEnable, tokenDisable, tokenToggle, tokenSetRadius;
 
-__attribute__((constructor))
-static void initializeSharpenerDarwinNotificationHandler() {
-    // Reset initial state
-    customRadius = 0;
-    enableSharpener = YES;
-    enableCustomRadius = YES;
+// __attribute__((constructor))
+// static void initializeSharpenerDarwinNotificationHandler() {
+//     // Reset initial state
+//     customRadius = 0;
+//     enableSharpener = YES;
+//     enableCustomRadius = YES;
     
-    // Apply corner radius to all existing windows immediately
-    dispatch_async(dispatch_get_main_queue(), ^{
-        for (NSWindow *window in [NSApplication sharedApplication].windows) {
-            applyCornerRadiusToWindow(window);
-        }
-    });
+//     // Apply corner radius to all existing windows immediately
+//     dispatch_async(dispatch_get_main_queue(), ^{
+//         for (NSWindow *window in [NSApplication sharedApplication].windows) {
+//             applyCornerRadiusToWindow(window);
+//         }
+//     });
     
-    // Register for the "enable" notification.
-    notify_register_dispatch("com.aspauldingcode.apple_sharpener.enable",
-                               &tokenEnable,
-                               dispatch_get_main_queue(),
-                               ^(int __unused token) {
-        enableCustomRadius = YES;
-        for (NSWindow *window in [NSApplication sharedApplication].windows) {
-            NSRect originalFrame = window.frame;
-            NSRect tempFrame = NSInsetRect(originalFrame, 0.5, 0.5);
-            [window setFrame:tempFrame display:YES];
-            [window setFrame:originalFrame display:YES];
-            NSView *titlebarView = [window valueForKey:@"_titlebarDecorationView"];
-            [titlebarView setNeedsDisplay:YES];
-        }
-        toggleSquareCorners(YES, customRadius);
-    });
+//     // Register for the "enable" notification.
+//     notify_register_dispatch("com.aspauldingcode.apple_sharpener.enable",
+//                                &tokenEnable,
+//                                dispatch_get_main_queue(),
+//                                ^(int __unused token) {
+//         enableCustomRadius = YES;
+//         for (NSWindow *window in [NSApplication sharedApplication].windows) {
+//             NSRect originalFrame = window.frame;
+//             NSRect tempFrame = NSInsetRect(originalFrame, 0.5, 0.5);
+//             [window setFrame:tempFrame display:YES];
+//             [window setFrame:originalFrame display:YES];
+//             NSView *titlebarView = [window valueForKey:@"_titlebarDecorationView"];
+//             [titlebarView setNeedsDisplay:YES];
+//         }
+//         toggleSquareCorners(YES, customRadius);
+//     });
     
-    // Register for the "disable" notification.
-    notify_register_dispatch("com.aspauldingcode.apple_sharpener.disable",
-                               &tokenDisable,
-                               dispatch_get_main_queue(),
-                               ^(int __unused token) {
-        toggleSquareCorners(NO, customRadius);
-    });
+//     // Register for the "disable" notification.
+//     notify_register_dispatch("com.aspauldingcode.apple_sharpener.disable",
+//                                &tokenDisable,
+//                                dispatch_get_main_queue(),
+//                                ^(int __unused token) {
+//         toggleSquareCorners(NO, customRadius);
+//     });
     
-    // Register for the "toggle" notification.
-    notify_register_dispatch("com.aspauldingcode.apple_sharpener.toggle",
-                               &tokenToggle,
-                               dispatch_get_main_queue(),
-                               ^(int __unused token) {
-        enableCustomRadius = !enableCustomRadius;
-        toggleSquareCorners(enableCustomRadius, customRadius);
-    });
+//     // Register for the "toggle" notification.
+//     notify_register_dispatch("com.aspauldingcode.apple_sharpener.toggle",
+//                                &tokenToggle,
+//                                dispatch_get_main_queue(),
+//                                ^(int __unused token) {
+//         enableCustomRadius = !enableCustomRadius;
+//         toggleSquareCorners(enableCustomRadius, customRadius);
+//     });
     
-    // Register for "set_radius". Use notify_get_state to read the new radius.
-    notify_register_dispatch("com.aspauldingcode.apple_sharpener.set_radius",
-                               &tokenSetRadius,
-                               dispatch_get_main_queue(),
-                               ^(int token) {
-        uint64_t newRadius = 0;
-        notify_get_state(token, &newRadius);
-        toggleSquareCorners(enableCustomRadius, newRadius);
-    });
-}
+//     // Register for "set_radius". Use notify_get_state to read the new radius.
+//     notify_register_dispatch("com.aspauldingcode.apple_sharpener.set_radius",
+//                                &tokenSetRadius,
+//                                dispatch_get_main_queue(),
+//                                ^(int token) {
+//         uint64_t newRadius = 0;
+//         notify_get_state(token, &newRadius);
+//         toggleSquareCorners(enableCustomRadius, newRadius);
+//     });
+// }
