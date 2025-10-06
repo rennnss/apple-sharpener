@@ -27,15 +27,36 @@ static BOOL isStandardAppWindow(NSWindow *window) {
 static void applyCornerRadiusToWindow(NSWindow *window) {
     if (!isStandardAppWindow(window)) return;
     
+    // Try multiple approaches for setting corner radius
+    CGFloat radius = 0;
     if (window.styleMask & NSWindowStyleMaskFullScreen) {
-        [(id)window setValue:@(0) forKey:@"cornerRadius"];
+        radius = 0;
     } else if (enableSharpener && enableCustomRadius) {
-        [(id)window setValue:@(customRadius) forKey:@"cornerRadius"];
+        radius = customRadius;
     } else {
-        [(id)window setValue:@(10) forKey:@"cornerRadius"];
+        radius = 10;
     }
+    
+    // Method 1: Try setValue:forKey: (original approach)
+    @try {
+        [(id)window setValue:@(radius) forKey:@"cornerRadius"];
+    } @catch (NSException *exception) {
+        // Method 2: Try direct property access if available
+        if ([window respondsToSelector:@selector(setCornerRadius:)]) {
+            [window performSelector:@selector(setCornerRadius:) withObject:@(radius)];
+        }
+    }
+    
+    // Method 3: Try setting via layer if available
+    if (window.contentView.layer) {
+        window.contentView.layer.cornerRadius = radius;
+        window.contentView.layer.masksToBounds = (radius > 0);
+    }
+    
+    // Force window refresh
     [window invalidateShadow];
     [window.contentView setNeedsDisplay:YES];
+    [window displayIfNeeded];
 }
 
 #pragma mark - Tweak API
@@ -81,7 +102,15 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
     ZKOrig(void, frameRect, flag);
     
     if (!enableSharpener || !enableCustomRadius) {
-        [(id)self setValue:@(10) forKey:@"cornerRadius"];
+        // Reset to default radius
+        @try {
+            [(id)self setValue:@(10) forKey:@"cornerRadius"];
+        } @catch (NSException *exception) {
+            // Try alternative method
+            if ([self respondsToSelector:@selector(setCornerRadius:)]) {
+                [self performSelector:@selector(setCornerRadius:) withObject:@(10)];
+            }
+        }
         [self invalidateShadow];
         return;
     }
@@ -95,6 +124,37 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
 - (void)toggleFullScreen:(id)sender {
     // Let the setFrame:display: update the corner radius after the transition.
     ZKOrig(void, sender);
+}
+
+// Try to swizzle additional methods that might control corner radius
+- (void)_updateCornerMask {
+    if (enableSharpener && enableCustomRadius && isStandardAppWindow(self)) {
+        // Apply our custom corner radius instead of the default
+        applyCornerRadiusToWindow(self);
+    } else {
+        ZKOrig(void);
+    }
+}
+
+- (void)_setCornerRadius:(CGFloat)radius {
+    if (enableSharpener && enableCustomRadius && isStandardAppWindow(self)) {
+        // Override with our custom radius
+        ZKOrig(void, customRadius);
+    } else {
+        ZKOrig(void, radius);
+    }
+}
+
+// Swizzle init to apply corner radius to new windows
+- (id)init {
+    id result = ZKOrig(id);
+    if (result) {
+        // Apply corner radius after a short delay to ensure window is fully initialized
+        dispatch_async(dispatch_get_main_queue(), ^{
+            applyCornerRadiusToWindow((NSWindow *)result);
+        });
+    }
+    return result;
 }
 
 @end
@@ -142,6 +202,13 @@ static void initializeSharpenerDarwinNotificationHandler() {
     customRadius = 0;
     enableSharpener = YES;
     enableCustomRadius = YES;
+    
+    // Apply corner radius to all existing windows immediately
+    dispatch_async(dispatch_get_main_queue(), ^{
+        for (NSWindow *window in [NSApplication sharedApplication].windows) {
+            applyCornerRadiusToWindow(window);
+        }
+    });
     
     // Register for the "enable" notification.
     notify_register_dispatch("com.aspauldingcode.apple_sharpener.enable",
