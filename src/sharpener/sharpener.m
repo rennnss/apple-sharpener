@@ -189,11 +189,11 @@ ZKSwizzleInterface(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView)
 
 @end
 
-#pragma mark - Darwin Notification Handler
+//#pragma mark - Darwin Notification Handler
 
 // Use the low‑level Darwin notify API instead of NSDistributedNotificationCenter.
 // This avoids loading extra system agents.
-static int tokenEnable, tokenDisable, tokenToggle, tokenSetRadius;
+//static int tokenEnable, tokenDisable, tokenToggle, tokenSetRadius;
 
 // __attribute__((constructor))
 // static void initializeSharpenerDarwinNotificationHandler() {
