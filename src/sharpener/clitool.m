@@ -33,13 +33,37 @@ int main(int argc, const char * argv[]) {
         }
         
         if ([firstArg isEqualToString:@"on"]) {
+            // Backward-compatible event
             notify_post("com.aspauldingcode.apple_sharpener.enable");
+            // Persistent enabled state
+            int tokenEnabled = 0;
+            if (notify_register_check("com.aspauldingcode.apple_sharpener.enabled", &tokenEnabled) == NOTIFY_STATUS_OK) {
+                notify_set_state(tokenEnabled, 1);
+                notify_post("com.aspauldingcode.apple_sharpener.enabled");
+            }
             printf("Sharpener enabled\n");
         } else if ([firstArg isEqualToString:@"off"]) {
+            // Backward-compatible event
             notify_post("com.aspauldingcode.apple_sharpener.disable");
+            // Persistent enabled state
+            int tokenEnabled = 0;
+            if (notify_register_check("com.aspauldingcode.apple_sharpener.enabled", &tokenEnabled) == NOTIFY_STATUS_OK) {
+                notify_set_state(tokenEnabled, 0);
+                notify_post("com.aspauldingcode.apple_sharpener.enabled");
+            }
             printf("Sharpener disabled\n");
         } else if ([firstArg isEqualToString:@"toggle"]) {
+            // Backward-compatible event
             notify_post("com.aspauldingcode.apple_sharpener.toggle");
+            // Persistent enabled state toggle
+            int tokenEnabled = 0;
+            if (notify_register_check("com.aspauldingcode.apple_sharpener.enabled", &tokenEnabled) == NOTIFY_STATUS_OK) {
+                uint64_t state = 0;
+                notify_get_state(tokenEnabled, &state);
+                uint64_t newState = (state == 0) ? 1 : 0;
+                notify_set_state(tokenEnabled, newState);
+                notify_post("com.aspauldingcode.apple_sharpener.enabled");
+            }
             printf("Sharpener toggled\n");
         } else if ([firstArg hasPrefix:@"--radius="] || ([firstArg isEqualToString:@"-r"] && argc > 2)) {
             uint64_t radius = 0;
@@ -60,8 +84,34 @@ int main(int argc, const char * argv[]) {
                 return 1;
             }
         } else if ([firstArg isEqualToString:@"--show-radius"] || [firstArg isEqualToString:@"-s"]) {
-            notify_post("com.aspauldingcode.apple_sharpener.get_radius");
-            printf("Radius query sent\n");
+            // Read the current radius from the shared state on the set_radius channel
+            int tokenShowRadius = 0;
+            uint64_t currentRadius = 0;
+            if (notify_register_check("com.aspauldingcode.apple_sharpener.set_radius", &tokenShowRadius) == NOTIFY_STATUS_OK) {
+                if (notify_get_state(tokenShowRadius, &currentRadius) != NOTIFY_STATUS_OK) {
+                    printf("Failed to read current radius\n");
+                    return 1;
+                }
+            } else {
+                printf("Failed to register set_radius notification for reading\n");
+                return 1;
+            }
+
+            // Read enabled status from persistent state
+            int tokenEnabled = 0;
+            uint64_t enabledState = 0;
+            if (notify_register_check("com.aspauldingcode.apple_sharpener.enabled", &tokenEnabled) == NOTIFY_STATUS_OK) {
+                if (notify_get_state(tokenEnabled, &enabledState) != NOTIFY_STATUS_OK) {
+                    printf("Failed to read current status\n");
+                    return 1;
+                }
+            } else {
+                printf("Failed to register enabled notification for reading\n");
+                return 1;
+            }
+
+            printf("Current radius: %llu\n", currentRadius);
+            printf("Status: %s\n", enabledState ? "on" : "off");
         } else {
             printf("Unknown command: %s\n", [firstArg UTF8String]);
             printUsage();
