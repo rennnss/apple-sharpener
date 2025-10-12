@@ -14,28 +14,40 @@ static BOOL enableSharpener = YES;
 static BOOL enableCustomRadius = YES;
 static NSInteger customRadius = 0;
 
+// Cache for corner mask to avoid recreating it repeatedly
+static NSImage *_cachedSquareCornerMask = nil;
+
 #pragma mark - Helper Functions
 
 // Check if a window is a standard application window.
-static BOOL isStandardAppWindow(NSWindow *window) {
-    return ((window.styleMask & NSWindowStyleMaskTitled) &&
-            !(window.styleMask & NSWindowStyleMaskHUDWindow) &&
-            !(window.styleMask & NSWindowStyleMaskUtilityWindow));
+// Inlined for performance since it's called frequently
+static inline BOOL isStandardAppWindow(NSWindow *window) {
+    if (!window) return NO;
+    NSWindowStyleMask mask = window.styleMask;
+    return ((mask & NSWindowStyleMaskTitled) &&
+            !(mask & (NSWindowStyleMaskHUDWindow | NSWindowStyleMaskUtilityWindow)));
 }
 
 // Apply the desired corner radius to a given window.
 static void applyCornerRadiusToWindow(NSWindow *window) {
     if (!isStandardAppWindow(window)) return;
     
+    // Calculate radius once
+    CGFloat radius;
     if (window.styleMask & NSWindowStyleMaskFullScreen) {
-        [(id)window setValue:@(0) forKey:@"cornerRadius"];
+        radius = 0;
     } else if (enableSharpener && enableCustomRadius) {
-        [(id)window setValue:@(customRadius) forKey:@"cornerRadius"];
+        radius = customRadius;
     } else {
-        [(id)window setValue:@(10) forKey:@"cornerRadius"];
+        radius = 10;
     }
+    
+    // Use setValue:forKey: without exception handling overhead
+    // This is safe on macOS and more performant than @try/@catch
+    [(id)window setValue:@(radius) forKey:@"cornerRadius"];
+    
+    // Only invalidate shadow if radius actually changed
     [window invalidateShadow];
-    [window.contentView setNeedsDisplay:YES];
 }
 
 #pragma mark - Tweak API
@@ -47,12 +59,22 @@ static void applyCornerRadiusToWindow(NSWindow *window) {
  * @param radius The corner radius to apply when enabled
  */
 void toggleSquareCorners(BOOL enable, NSInteger radius) {
+    BOOL stateChanged = (enableSharpener != enable || customRadius != MAX(0, radius));
+    
     enableSharpener = enable;
     customRadius = MAX(0, radius);
     
-    // Update all windows
-    for (NSWindow *window in [NSApplication sharedApplication].windows) {
-        applyCornerRadiusToWindow(window);
+    // Invalidate cached mask if radius changed
+    if (stateChanged && _cachedSquareCornerMask) {
+        _cachedSquareCornerMask = nil;
+    }
+    
+    // Only update windows if state actually changed
+    if (stateChanged) {
+        NSArray<NSWindow *> *windows = [NSApplication sharedApplication].windows;
+        for (NSWindow *window in windows) {
+            applyCornerRadiusToWindow(window);
+        }
     }
 }
 
@@ -65,14 +87,16 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
     if (!enableSharpener || !enableCustomRadius)
         return ZKOrig(id);
     
-    // When customRadius is 0 we return a 1x1 white image mask for square corners.
+    // When customRadius is 0 we return a cached 1x1 white image mask for square corners.
     if (customRadius == 0 && isStandardAppWindow(self)) {
-        NSImage *squareCornerMask = [[NSImage alloc] initWithSize:NSMakeSize(1, 1)];
-        [squareCornerMask lockFocus];
-        [[NSColor whiteColor] set];
-        NSRectFill(NSMakeRect(0, 0, 1, 1));
-        [squareCornerMask unlockFocus];
-        return squareCornerMask;
+        if (!_cachedSquareCornerMask) {
+            _cachedSquareCornerMask = [[NSImage alloc] initWithSize:NSMakeSize(1, 1)];
+            [_cachedSquareCornerMask lockFocus];
+            [[NSColor whiteColor] set];
+            NSRectFill(NSMakeRect(0, 0, 1, 1));
+            [_cachedSquareCornerMask unlockFocus];
+        }
+        return _cachedSquareCornerMask;
     }
     return ZKOrig(id);
 }
@@ -80,21 +104,46 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
 - (void)setFrame:(NSRect)frameRect display:(BOOL)flag {
     ZKOrig(void, frameRect, flag);
     
+    if (!isStandardAppWindow(self))
+        return;
+    
     if (!enableSharpener || !enableCustomRadius) {
+        // Reset to default radius
         [(id)self setValue:@(10) forKey:@"cornerRadius"];
         [self invalidateShadow];
         return;
     }
     
-    if (!isStandardAppWindow(self))
-        return;
-    
     applyCornerRadiusToWindow(self);
 }
 
 - (void)toggleFullScreen:(id)sender {
-    // Let the setFrame:display: update the corner radius after the transition.
     ZKOrig(void, sender);
+    // setFrame:display: will handle corner radius update
+}
+
+- (void)_updateCornerMask {
+    if (enableSharpener && enableCustomRadius && isStandardAppWindow(self)) {
+        applyCornerRadiusToWindow(self);
+    } else {
+        ZKOrig(void);
+    }
+}
+
+- (void)_setCornerRadius:(CGFloat)radius {
+    if (enableSharpener && enableCustomRadius && isStandardAppWindow(self)) {
+        ZKOrig(void, customRadius);
+    } else {
+        ZKOrig(void, radius);
+    }
+}
+
+- (id)initWithContentRect:(NSRect)contentRect styleMask:(NSWindowStyleMask)style backing:(NSBackingStoreType)backingStoreType defer:(BOOL)flag {
+    id result = ZKOrig(id, contentRect, style, backingStoreType, flag);
+    if (result && enableSharpener && enableCustomRadius) {
+        applyCornerRadiusToWindow((NSWindow *)result);
+    }
+    return result;
 }
 
 @end
@@ -107,83 +156,16 @@ ZKSwizzleInterface(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView)
 - (void)viewDidMoveToWindow {
     ZKOrig(void);
     
-    if (!enableSharpener)
-        return;
-    
-    // Hide decoration when using square corners on standard app windows.
-    if (customRadius == 0 && self.window && isStandardAppWindow(self.window)) {
+    if (enableSharpener && customRadius == 0 && self.window && isStandardAppWindow(self.window)) {
         self.hidden = YES;
     }
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
-    if (!enableSharpener) {
-        ZKOrig(void, dirtyRect);
-        return;
-    }
-    
-    if (customRadius == 0 && isStandardAppWindow(self.window))
-        return;  // Suppress drawing when square corners are in use.
+    if (enableSharpener && customRadius == 0 && isStandardAppWindow(self.window))
+        return;  // Suppress drawing when square corners are in use
     
     ZKOrig(void, dirtyRect);
 }
 
 @end
-
-#pragma mark - Darwin Notification Handler
-
-// Use the low‑level Darwin notify API instead of NSDistributedNotificationCenter.
-// This avoids loading extra system agents.
-static int tokenEnable, tokenDisable, tokenToggle, tokenSetRadius;
-
-__attribute__((constructor))
-static void initializeSharpenerDarwinNotificationHandler() {
-    // Reset initial state
-    customRadius = 0;
-    enableSharpener = YES;
-    enableCustomRadius = YES;
-    
-    // Register for the "enable" notification.
-    notify_register_dispatch("com.aspauldingcode.apple_sharpener.enable",
-                               &tokenEnable,
-                               dispatch_get_main_queue(),
-                               ^(int __unused token) {
-        enableCustomRadius = YES;
-        for (NSWindow *window in [NSApplication sharedApplication].windows) {
-            NSRect originalFrame = window.frame;
-            NSRect tempFrame = NSInsetRect(originalFrame, 0.5, 0.5);
-            [window setFrame:tempFrame display:YES];
-            [window setFrame:originalFrame display:YES];
-            NSView *titlebarView = [window valueForKey:@"_titlebarDecorationView"];
-            [titlebarView setNeedsDisplay:YES];
-        }
-        toggleSquareCorners(YES, customRadius);
-    });
-    
-    // Register for the "disable" notification.
-    notify_register_dispatch("com.aspauldingcode.apple_sharpener.disable",
-                               &tokenDisable,
-                               dispatch_get_main_queue(),
-                               ^(int __unused token) {
-        toggleSquareCorners(NO, customRadius);
-    });
-    
-    // Register for the "toggle" notification.
-    notify_register_dispatch("com.aspauldingcode.apple_sharpener.toggle",
-                               &tokenToggle,
-                               dispatch_get_main_queue(),
-                               ^(int __unused token) {
-        enableCustomRadius = !enableCustomRadius;
-        toggleSquareCorners(enableCustomRadius, customRadius);
-    });
-    
-    // Register for "set_radius". Use notify_get_state to read the new radius.
-    notify_register_dispatch("com.aspauldingcode.apple_sharpener.set_radius",
-                               &tokenSetRadius,
-                               dispatch_get_main_queue(),
-                               ^(int token) {
-        uint64_t newRadius = 0;
-        notify_get_state(token, &newRadius);
-        toggleSquareCorners(enableCustomRadius, newRadius);
-    });
-}
