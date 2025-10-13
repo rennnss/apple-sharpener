@@ -16,8 +16,6 @@ static NSInteger customRadius = 0;
 
 // Cache for corner mask to avoid recreating it repeatedly
 static NSImage *_cachedSquareCornerMask = nil;
-// Cache original per-window corner radius so we can restore on disable
-static NSMapTable<NSWindow *, NSNumber *> *ASOriginalRadiusMap = nil;
 
 #pragma mark - Notification Wiring
 
@@ -27,8 +25,6 @@ void toggleSquareCorners(BOOL enable, NSInteger radius);
 static void setupSharpenerNotifications(void) __attribute__((constructor));
 static void setupSharpenerNotifications(void) {
     dispatch_queue_t queue = dispatch_get_main_queue();
-    // Initialize original radius cache (weak keys to avoid retaining windows)
-    ASOriginalRadiusMap = [NSMapTable weakToStrongObjectsMapTable];
 
     // Persistent state keys
     static const char *kNotifyEnabled = "com.aspauldingcode.apple_sharpener.enabled";
@@ -109,24 +105,8 @@ static void applyCornerRadiusToWindow(NSWindow *window) {
         return;
     }
     
-    // Calculate radius once
-    CGFloat radius;
-    if (window.styleMask & NSWindowStyleMaskFullScreen) {
-        radius = 0;
-    } else {
-        radius = customRadius;
-    }
-    
-    // Cache original radius once per window so we can restore it later
-    if (ASOriginalRadiusMap && ![ASOriginalRadiusMap objectForKey:window]) {
-        NSNumber *orig = [(id)window valueForKey:@"cornerRadius"];
-        if (orig) {
-            [ASOriginalRadiusMap setObject:orig forKey:window];
-        }
-    }
-
     // Use setValue:forKey: without exception handling overhead
-    [(id)window setValue:@(radius) forKey:@"cornerRadius"];
+    [(id)window setValue:@(customRadius) forKey:@"cornerRadius"];
     
     // Invalidate shadow after radius change
     [window invalidateShadow];
@@ -153,21 +133,12 @@ void toggleSquareCorners(BOOL enable, NSInteger radius) {
     
     // Only update windows if state actually changed
     if (stateChanged) {
-        NSArray<NSWindow *> *windows = [NSApplication sharedApplication].windows;
-        for (NSWindow *window in windows) {
+        for (NSWindow *window in [NSApplication sharedApplication].windows) {
             if (enableSharpener && enableCustomRadius) {
                 applyCornerRadiusToWindow(window);
-            } else {
-                // Restore original per-window radius if we captured one
-                NSNumber *orig = [ASOriginalRadiusMap objectForKey:window];
-                if (orig) {
-                    [(id)window setValue:orig forKey:@"cornerRadius"];
-                    [window invalidateShadow];
-                    [ASOriginalRadiusMap removeObjectForKey:window];
-                } else {
-                    // Fallback: nudge frame to let system recompute
-                    [window setFrame:window.frame display:YES];
-                }
+            } else if (isStandardAppWindow(window)) {
+                [(id)window setValue:@0 forKey:@"cornerRadius"];
+                [window invalidateShadow];
             }
         }
     }
@@ -198,16 +169,8 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
 
 - (void)setFrame:(NSRect)frameRect display:(BOOL)flag {
     ZKOrig(void, frameRect, flag);
-    
-    if (!isStandardAppWindow(self))
-        return;
-    
-    if (!enableSharpener || !enableCustomRadius) {
-        // Do not override; allow system default behavior
-        return;
-    }
-    
-    applyCornerRadiusToWindow(self);
+    if (enableSharpener && enableCustomRadius && isStandardAppWindow(self))
+        applyCornerRadiusToWindow(self);
 }
 
 - (void)toggleFullScreen:(id)sender {
@@ -223,18 +186,29 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
     }
 }
 
+// This thing here is what determines if it's going to be square, or rounded with custom radius.
 - (void)_setCornerRadius:(CGFloat)radius {
-    if (enableSharpener && enableCustomRadius && isStandardAppWindow(self)) {
-        ZKOrig(void, customRadius);
-    } else {
+    if (!enableSharpener || !enableCustomRadius || !isStandardAppWindow(self)) {
         ZKOrig(void, radius);
+        return;
     }
+
+    if (customRadius == 0) {
+        // Explicitly restore square corners
+        ZKOrig(void, 0);
+        return;
+    }
+
+    // Otherwise, use the custom rounding behavior
+    CGFloat r = (self.styleMask & NSWindowStyleMaskFullScreen) ? 0 : customRadius;
+    ZKOrig(void, r);
 }
+
 
 - (id)initWithContentRect:(NSRect)contentRect styleMask:(NSWindowStyleMask)style backing:(NSBackingStoreType)backingStoreType defer:(BOOL)flag {
     id result = ZKOrig(id, contentRect, style, backingStoreType, flag);
     if (result && enableSharpener && enableCustomRadius) {
-        applyCornerRadiusToWindow((NSWindow *)result);
+            applyCornerRadiusToWindow((NSWindow *)result);
     }
     return result;
 }
@@ -250,7 +224,10 @@ ZKSwizzleInterface(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView)
     ZKOrig(void);
     
     // Keep decoration view visibility in sync with current state
-    BOOL shouldHide = (enableSharpener && customRadius == 0 && self.window && isStandardAppWindow(self.window));
+    BOOL shouldHide = (enableSharpener && 
+                       customRadius == 0 && 
+                       self.window && 
+                       isStandardAppWindow(self.window));
     self.hidden = shouldHide;
 }
 
