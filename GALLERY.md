@@ -4,10 +4,6 @@ This gallery showcases Apple Sharpener in action across different macOS versions
 
 ## Preview Images
 
-### Merged Preview
-![Merged Preview](./PreviewMerge.png)
-*Combined view showing Apple Sharpener's effect*
-
 ### Example Radius Configuration
 ![Example Radius](./previewExampleRadius.png)
 *Demonstration of custom radius settings*
