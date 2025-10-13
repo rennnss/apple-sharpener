@@ -23,3 +23,6 @@ xcuserdata/
 
 # Ccls cache
 .ccls-cache/
+
+# Log files
+*.log
