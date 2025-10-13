@@ -1,13 +1,22 @@
-# Dynamic compiler detection
-XCODE_PATH := $(shell xcode-select -p)
-XCODE_TOOLCHAIN := $(XCODE_PATH)/Toolchains/XcodeDefault.xctoolchain
-CC := $(shell xcrun -find clang)
-CXX := $(shell xcrun -find clang++)
+ifeq (,$(filter help completion,$(MAKECMDGOALS)))
+  # Dynamic compiler detection
+  XCODE_PATH := $(shell xcode-select -p)
+  XCODE_TOOLCHAIN := $(XCODE_PATH)/Toolchains/XcodeDefault.xctoolchain
+  CC := $(shell xcrun -find clang)
+  CXX := $(shell xcrun -find clang++)
 
-# SDK paths
-SDKROOT ?= $(shell xcrun --show-sdk-path)
-ISYSROOT := $(shell xcrun -sdk macosx --show-sdk-path)
-INCLUDE_PATH := $(shell xcrun -sdk macosx --show-sdk-platform-path)/Developer/SDKs/MacOSX.sdk/usr/include
+  # SDK paths
+  SDKROOT ?= $(shell xcrun --show-sdk-path)
+  ISYSROOT := $(shell xcrun -sdk macosx --show-sdk-path)
+  INCLUDE_PATH := $(shell xcrun -sdk macosx --show-sdk-platform-path)/Developer/SDKs/MacOSX.sdk/usr/include
+else
+  # Fallbacks for non-build goals to avoid SDK discovery
+  CC := clang
+  CXX := clang++
+  SDKROOT :=
+  ISYSROOT :=
+  INCLUDE_PATH :=
+endif
 
 # Compiler and flags
 CFLAGS = -Wall -Wextra -O2 \
@@ -52,7 +61,7 @@ DYLIB_FLAGS = -dynamiclib \
               -current_version 1.0.0
 
 # Default target
-all: clean $(BUILD_DIR)/$(DYLIB_NAME) $(BUILD_DIR)/$(CLI_NAME)
+all: clean $(BUILD_DIR)/$(DYLIB_NAME) $(BUILD_DIR)/$(CLI_NAME) ## Build dylib and CLI
 
 # Create build directory and subdirectories
 $(BUILD_DIR):
@@ -78,12 +87,13 @@ $(BUILD_DIR)/$(DYLIB_NAME): $(DYLIB_OBJECTS)
 $(BUILD_DIR)/$(CLI_NAME): $(CLI_SOURCE)
 	@rm -f $(BUILD_DIR)/$(CLI_NAME)
 	$(CC) $(CFLAGS) $(ARCHS) $(CLI_SOURCE) \
+		-DAPPLE_SHARPENER_VERSION="\"$(shell cat VERSION)\"" \
 		-framework Foundation \
 		-framework CoreFoundation \
 		-o $@
 
 # Install both dylib and CLI tool
-install: $(BUILD_DIR)/$(DYLIB_NAME) $(BUILD_DIR)/$(CLI_NAME)
+install: $(BUILD_DIR)/$(DYLIB_NAME) $(BUILD_DIR)/$(CLI_NAME) ## Install dylib and CLI to system
 	@echo "Installing dylib to $(INSTALL_DIR) and CLI tool to $(CLI_INSTALL_DIR)"
 	# Create the target directories.
 	sudo mkdir -p $(INSTALL_DIR)
@@ -102,7 +112,7 @@ install: $(BUILD_DIR)/$(DYLIB_NAME) $(BUILD_DIR)/$(CLI_NAME)
 	fi
 
 # Test target that builds, installs, and relaunches test applications
-test: install
+test: install ## Build, install, and restart test applications
 	@echo "Force quitting test applications..."
 	$(eval TEST_APPS := Spotify "System Settings" Chess soffice "Brave Browser" Beeper Safari Finder)
 	@for app in $(TEST_APPS); do \
@@ -117,12 +127,12 @@ test: install
 	@echo "Test applications restarted with new dylib loaded"
 
 # Clean build files
-clean:
+clean: ## Remove build directory and artifacts
 	@rm -rf $(BUILD_DIR)
 	@echo "Cleaned build directory"
 
 # Delete installed files
-delete:
+delete: ## Delete installed files and relaunch Finder
 	@echo "Force quitting test applications..."
 	$(eval TEST_APPS := Spotify "System Settings" Chess soffice "Brave Browser" Beeper Safari Finder)
 	@for app in $(TEST_APPS); do \
@@ -135,10 +145,18 @@ delete:
 	@echo "Deleted $(DYLIB_NAME), $(CLI_NAME), and blacklist from $(INSTALL_DIR)"
 
 # Uninstall
-uninstall:
+uninstall: ## Uninstall dylib, CLI, and blacklist
 	@sudo rm -f $(INSTALL_PATH)
 	@sudo rm -f $(CLI_INSTALL_PATH)
 	@sudo rm -f $(BLACKLIST_DEST)
 	@echo "Uninstalled $(DYLIB_NAME), $(CLI_NAME), and blacklist"
 
-.PHONY: all clean install test delete uninstall
+installer: ## Create a .pkg installer
+	@echo "Packaging Apple Sharpener into a .pkg installer"
+	./scripts/create_installer.sh
+
+help: ## Show this help
+	@echo "Available make targets:"
+	@grep -E '^[a-zA-Z0-9_.-]+:.*##' $(MAKEFILE_LIST) | sed 's/^\([^:]*\):.*##\s*\(.*\)/  \1|\2/' | awk -F'|' '{printf "  %-20s %s\n", $$1, $$2}'
+
+.PHONY: all clean install test delete uninstall installer help

@@ -60,6 +60,9 @@ void toggleSquareCorners(BOOL enable, NSInteger radius) {
 #pragma mark - Notification Setup
 
 static void setupSharpenerNotifications(void) {
+    // Perform grouped swizzling after +load has run to avoid class-method collisions
+    ZKSwizzleGroup(APPLE_SHARPENER);
+
     dispatch_queue_t queue = dispatch_get_main_queue();
 
     static const char *kNotifyEnabled = "com.aspauldingcode.apple_sharpener.enabled";
@@ -111,7 +114,7 @@ static void setupSharpenerNotifications(void) {
 
 #pragma mark - Swizzled NSWindow
 
-ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
+ ZKSwizzleInterfaceGroup(AS_NSWindow_CornerRadius, NSWindow, NSWindow, APPLE_SHARPENER)
 @implementation AS_NSWindow_CornerRadius
 
 #pragma clang diagnostic push
@@ -195,7 +198,7 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
 
 #pragma mark - Swizzled Titlebar Decoration View
 
-ZKSwizzleInterface(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView)
+ ZKSwizzleInterfaceGroup(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView, APPLE_SHARPENER)
 @implementation AS_TitlebarDecorationView
 
 - (void)viewDidMoveToWindow {

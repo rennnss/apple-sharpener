@@ -1,21 +1,20 @@
 #import <Foundation/Foundation.h>
 #import <notify.h>
 
+// Embed version at compile time; defaults to "dev" when not provided
+#ifndef APPLE_SHARPENER_VERSION
+#define APPLE_SHARPENER_VERSION "dev"
+#endif
+
 void printUsage() {
-    puts("Usage: sharpener [command] [options]\n"
+    puts("Usage: sharpener [on|off|toggle] [options]\n"
          "\nCommands:"
-         "\n  on             Enable window sharpening"
-         "\n  off            Disable window sharpening"
-         "\n  toggle         Toggle window sharpening"
+         "\n  on, off, toggle        Control sharpening"
          "\n\nOptions:"
-         "\n  --radius=<value>, -r <value>  Set the sharpening radius"
-         "\n  --show-radius, -s             Query current radius setting"
-         "\n  --help, -h                    Show this help message"
-         "\n\nExamples:"
-         "\n  sharpener --radius=40         Set radius to 40"
-         "\n  sharpener -r 40               Set radius to 40"
-         "\n  sharpener on                  Enable sharpening"
-         "\n  sharpener -s                  Query current radius");
+         "\n  -r, --radius <value>  Set sharpening radius"
+         "\n  -s, --status          Show current radius and status"
+         "\n  -v, --version         Show version"
+         "\n  -h, --help            Show this help message\n");
 }
 
 int main(int argc, const char * argv[]) {
@@ -29,6 +28,10 @@ int main(int argc, const char * argv[]) {
         
         if ([firstArg isEqualToString:@"--help"] || [firstArg isEqualToString:@"-h"]) {
             printUsage();
+            return 0;
+        }
+        if ([firstArg isEqualToString:@"--version"] || [firstArg isEqualToString:@"-v"]) {
+            printf("Apple Sharpener version: %s\n", APPLE_SHARPENER_VERSION);
             return 0;
         }
         
@@ -83,7 +86,7 @@ int main(int argc, const char * argv[]) {
                 printf("Failed to register set_radius notification\n");
                 return 1;
             }
-        } else if ([firstArg isEqualToString:@"--show-radius"] || [firstArg isEqualToString:@"-s"]) {
+        } else if ([firstArg isEqualToString:@"--status"] || [firstArg isEqualToString:@"-s"]) {
             // Read the current radius from the shared state on the set_radius channel
             int tokenShowRadius = 0;
             uint64_t currentRadius = 0;

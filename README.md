@@ -4,17 +4,25 @@ A macOS tweak that programmatically removes window corner radius to achieve clea
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-![preview](./preview.png)
+![Preview 3](./previewMerge.png)
+
+View more screenshots: [GALLERY.md](./GALLERY.md)
 
 # Video:
 [x.com/aspauldingcode/apple-sharpener](https://x.com/aspauldingcode/status/1889836621870318072)
 
 ## Features
 
-- Removes rounded corners from application windows
-- Preserves rounded corners for context menus and system UI elements
-- Compatible with both Intel and Apple Silicon Macs
-- Early injection ensures consistent window appearance
+- Square corners for application windows with configurable radius (`0` for sharp corners)
+- Live control via CLI: `on`, `off`, `toggle` (no app restart needed)
+- Live radius adjustment via `-r/--radius` with immediate effect across open windows
+- Status query via `-s/--show-radius` (shows current radius and on/off state)
+- Persists enabled state and radius across apps via `notifyd` channels
+- Preserves system UI (menus, popovers, HUD/utility windows) by targeting standard app windows only
+- Fullscreen-safe behavior; uses `0` radius in fullscreen to avoid visual artifacts
+- Early injection through Ammonia ensures consistent appearance at app startup
+- Universal build for Intel and Apple Silicon (x86_64, arm64, arm64e)
+- System process blacklist to avoid injecting into critical daemons
 
 ## Requirements
 
@@ -23,12 +31,9 @@ A macOS tweak that programmatically removes window corner radius to achieve clea
 
 ### System Security Settings
 
-The following security features must be disabled for Ammonia injection to work:
+For Ammonia injection to work, System Integrity Protection (SIP) must be disabled.
 
-- System Integrity Protection (SIP)
-- Library Validation
-
-To disable these features, you'll need to:
+To disable SIP, you'll need to:
 
 1. Boot into Recovery Mode:
    - For Apple Silicon Macs: Hold the power button until "Loading startup options" appears, then click "Options" and select a user/enter password
@@ -38,11 +43,7 @@ To disable these features, you'll need to:
    csrutil disable
    ```
 3. Restart your Mac:
-4. After restart, run in Terminal:
-   ```bash
-   sudo defaults write /Library/Preferences/com.apple.security.libraryvalidation.plist DisableLibraryValidation -bool true
-   ```
-5. For Apple Silicon Macs, enable the preview ABI by running:
+4. For Apple Silicon Macs, enable the preview ABI by running:
    ```bash
    sudo nvram boot-args="-arm64e_preview_abi"
    ```
@@ -70,6 +71,10 @@ To disable these features, you'll need to:
    sudo make install
    ```
 
+## Usage
+
+See the CLI usage guide: [CLI.md](./CLI.md)
+
 ## Troubleshooting
 Did you disable SIP?
 Did you follow this [readme](./README.md#requirements) carefully?
@@ -88,7 +93,7 @@ Contributions are welcome! Feel free to:
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Licensed under the [MIT License](./LICENSE).
 
 ## Acknowledgments
 
@@ -102,6 +107,12 @@ If you encounter any issues or have questions:
 1. Check the [Issues](../../issues) page for existing reports
 2. Open a new issue if needed
 3. Include your macOS version and device type when reporting problems
+
+If you find Apple Sharpener useful, please consider frequent donations to support ongoing development:
+
+- Ko‑fi: https://ko-fi.com/aspauldingcode
+
+- Share Apple Sharpener with friends!
 
 ## ⚠️ Security Notice
 
