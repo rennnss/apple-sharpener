@@ -86,17 +86,17 @@ static void setupSharpenerNotifications(void) {
     toggleSquareCorners(enableSharpener, customRadius);
 
     int tokenEnable = 0;
-    notify_register_dispatch("com.aspauldingcode.apple_sharpener.enable", &tokenEnable, queue, ^(int t){
+    notify_register_dispatch("com.aspauldingcode.apple_sharpener.enable", &tokenEnable, queue, ^(int __unused t){
         toggleSquareCorners(YES, customRadius);
     });
 
     int tokenDisable = 0;
-    notify_register_dispatch("com.aspauldingcode.apple_sharpener.disable", &tokenDisable, queue, ^(int t){
+    notify_register_dispatch("com.aspauldingcode.apple_sharpener.disable", &tokenDisable, queue, ^(int __unused t){
         toggleSquareCorners(NO, customRadius);
     });
 
     int tokenToggle = 0;
-    notify_register_dispatch("com.aspauldingcode.apple_sharpener.toggle", &tokenToggle, queue, ^(int t){
+    notify_register_dispatch("com.aspauldingcode.apple_sharpener.toggle", &tokenToggle, queue, ^(int __unused t){
         toggleSquareCorners(!enableSharpener, customRadius);
     });
 
@@ -114,16 +114,25 @@ static void setupSharpenerNotifications(void) {
 ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
 @implementation AS_NSWindow_CornerRadius
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wobjc-designated-initializers"
 - (id)initWithContentRect:(NSRect)contentRect styleMask:(NSWindowStyleMask)style backing:(NSBackingStoreType)backingStoreType defer:(BOOL)flag {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
     id result = ZKOrig(id, contentRect, style, backingStoreType, flag);
+#pragma clang diagnostic pop
     if (result && enableSharpener && enableCustomRadius) {
         applyCornerRadiusToWindow((NSWindow *)result);
     }
     return result;
 }
+#pragma clang diagnostic pop
 
 - (void)setFrame:(NSRect)frameRect display:(BOOL)flag {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
     ZKOrig(void, frameRect, flag);
+#pragma clang diagnostic pop
     if (enableSharpener && enableCustomRadius && isStandardAppWindow(self))
         applyCornerRadiusToWindow(self);
 }
@@ -132,33 +141,54 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
     if (enableSharpener && enableCustomRadius && isStandardAppWindow(self)) {
         applyCornerRadiusToWindow(self);
     } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
         ZKOrig(void);
+#pragma clang diagnostic pop
     }
 }
 
 - (void)_setCornerRadius:(CGFloat)radius {
     if (!enableSharpener || !enableCustomRadius || !isStandardAppWindow(self)) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
         ZKOrig(void, radius);
+#pragma clang diagnostic pop
         return;
     }
 
     if (customRadius == 0) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
         ZKOrig(void, 0);
+#pragma clang diagnostic pop
         return;
     }
 
     CGFloat r = (self.styleMask & NSWindowStyleMaskFullScreen) ? 0 : customRadius;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
     ZKOrig(void, r);
+#pragma clang diagnostic pop
 }
 
 - (id)_cornerMask {
     if (!enableSharpener || !enableCustomRadius)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
         return ZKOrig(id);
+#pragma clang diagnostic pop
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
     return ZKOrig(id);
+#pragma clang diagnostic pop
 }
 
 - (void)toggleFullScreen:(id)sender {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
     ZKOrig(void, sender);
+#pragma clang diagnostic pop
 }
 
 @end
@@ -169,14 +199,23 @@ ZKSwizzleInterface(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView)
 @implementation AS_TitlebarDecorationView
 
 - (void)viewDidMoveToWindow {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
     ZKOrig(void);
+#pragma clang diagnostic pop
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
     if (enableSharpener && customRadius != 0 && isStandardAppWindow(self.window)) {
         return;  // Suppress drawing when custom radius is used (but not when radius is 0)
     }
-    ZKOrig(void, dirtyRect);
+    
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
+    // Call original implementation
+    void (*originalDrawRect)(id, SEL, NSRect) = (void (*)(id, SEL, NSRect))ZKOriginalImplementation(self, _cmd, __PRETTY_FUNCTION__);
+    originalDrawRect(self, _cmd, dirtyRect);
+#pragma clang diagnostic pop
 }
 
 @end
