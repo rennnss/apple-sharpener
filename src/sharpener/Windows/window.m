@@ -26,11 +26,25 @@ static void setupWindowNotifications(void) __attribute__((constructor));
 static inline BOOL isStandardAppWindow(NSWindow *window) {
     if (!window) return NO;
     NSWindowStyleMask mask = window.styleMask;
-    return ((mask & NSWindowStyleMaskTitled) &&
-            !(mask & (NSWindowStyleMaskHUDWindow | NSWindowStyleMaskUtilityWindow)));
+    
+    // Only apply to standard titled windows, exclude system UI elements
+    if (!(mask & NSWindowStyleMaskTitled)) return NO;
+    
+    // Exclude HUD, utility, and other system windows
+    if (mask & (NSWindowStyleMaskHUDWindow | NSWindowStyleMaskUtilityWindow)) return NO;
+    
+    // Exclude context menus, tooltips, and other transient windows
+    if (window.level != NSNormalWindowLevel) return NO;
+    
+    // Exclude very small windows (likely UI elements)
+    NSRect frame = window.frame;
+    if (frame.size.width < 100 || frame.size.height < 50) return NO;
+    
+    return YES;
 }
 
 static void applyCornerRadiusToWindow(NSWindow *window) {
+    if (!window || !enableSharpener) return;
     if (!isStandardAppWindow(window)) return;
     if (!(enableSharpener && enableCustomRadius)) return;
     
@@ -73,6 +87,16 @@ static void setupWindowNotifications(void) {
     NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:@"com.aspauldingcode.apple_sharpener"];
     enableSharpener = [defaults boolForKey:@"enabled"];
     customRadius = [defaults integerForKey:@"radius"];
+
+    // Add observers for multiple window events to catch all window creation scenarios
+    // Add observers for window events to apply corner radius when windows become active
+    [[NSNotificationCenter defaultCenter] addObserverForName:NSWindowDidBecomeMainNotification object:nil queue:nil usingBlock:^(NSNotification *notification) {
+        applyCornerRadiusToWindow(notification.object);
+    }];
+    
+    [[NSNotificationCenter defaultCenter] addObserverForName:NSWindowDidBecomeKeyNotification object:nil queue:nil usingBlock:^(NSNotification *notification) {
+        applyCornerRadiusToWindow(notification.object);
+    }];
 
     NSLog(@"[AppleSharpener] Windows: Loaded enableSharpener: %d, customRadius: %ld", enableSharpener, (long)customRadius);
 
@@ -119,20 +143,6 @@ static void setupWindowNotifications(void) {
  ZKSwizzleInterfaceGroup(AS_NSWindow_CornerRadius, NSWindow, NSWindow, APPLE_SHARPENER)
 @implementation AS_NSWindow_CornerRadius
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wobjc-designated-initializers"
-- (id)initWithContentRect:(NSRect)contentRect styleMask:(NSWindowStyleMask)style backing:(NSBackingStoreType)backingStoreType defer:(BOOL)flag {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
-    id result = ZKOrig(id, contentRect, style, backingStoreType, flag);
-#pragma clang diagnostic pop
-    if (result && enableSharpener && enableCustomRadius) {
-        applyCornerRadiusToWindow((NSWindow *)result);
-    }
-    return result;
-}
-#pragma clang diagnostic pop
-
 - (void)setFrame:(NSRect)frameRect display:(BOOL)flag {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
@@ -178,11 +188,6 @@ static void setupWindowNotifications(void) {
 }
 
 - (id)_cornerMask {
-    if (!enableSharpener || !enableCustomRadius)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
-        return ZKOrig(id);
-#pragma clang diagnostic pop
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
     return ZKOrig(id);
@@ -200,7 +205,7 @@ static void setupWindowNotifications(void) {
 
 #pragma mark - Swizzled Titlebar Decoration View
 
- ZKSwizzleInterfaceGroup(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView, APPLE_SHARPENER)
+ZKSwizzleInterfaceGroup(AS_TitlebarDecorationView, _NSTitlebarDecorationView, NSView, APPLE_SHARPENER)
 @implementation AS_TitlebarDecorationView
 
 - (void)viewDidMoveToWindow {
@@ -217,9 +222,7 @@ static void setupWindowNotifications(void) {
     
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
-    // Call original implementation
-    void (*originalDrawRect)(id, SEL, NSRect) = (void (*)(id, SEL, NSRect))ZKOriginalImplementation(self, _cmd, __PRETTY_FUNCTION__);
-    originalDrawRect(self, _cmd, dirtyRect);
+    ZKOrig(void, dirtyRect);
 #pragma clang diagnostic pop
 }
 

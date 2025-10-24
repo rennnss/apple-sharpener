@@ -117,7 +117,7 @@ install: $(BUILD_DIR)/$(DYLIB_NAME) $(BUILD_DIR)/$(CLI_NAME) ## Install dylib an
 # Test target that builds, installs, and relaunches test applications
 test: install ## Build, install, and restart test applications
 	@echo "Force quitting test applications and Dock..."
-	$(eval TEST_APPS := Spotify "System Settings" Chess soffice "Brave Browser" Beeper Safari Finder)
+	$(eval TEST_APPS := Spotify "System Settings" Chess soffice "Brave Browser" Beeper Safari Finder qBittorrent zoom.us)
 	@for app in $(TEST_APPS); do \
 		pkill -9 "$$app" 2>/dev/null || true; \
 	done
@@ -125,8 +125,10 @@ test: install ## Build, install, and restart test applications
 	@pkill -9 "Dock" 2>/dev/null || true
 	@echo "Relaunching test applications..."
 	@for app in $(TEST_APPS); do \
-		if [ "$$app" != "soffice" ]; then \
+		if [ "$$app" != "soffice" ] && [ "$$app" != "zoom.us" ]; then \
 			open -a "$$app" 2>/dev/null || true; \
+		elif [ "$$app" = "zoom.us" ]; then \
+			open -a "zoom.us" 2>/dev/null || true; \
 		fi; \
 	done
 	@echo "Test applications and Dock restarted with new dylib loaded"
@@ -139,7 +141,7 @@ clean: ## Remove build directory and artifacts
 # Delete installed files
 delete: ## Delete installed files and relaunch Finder
 	@echo "Force quitting test applications and Dock..."
-	$(eval TEST_APPS := Spotify "System Settings" Chess soffice "Brave Browser" Beeper Safari Finder)
+	$(eval TEST_APPS := Spotify "System Settings" Chess soffice "Brave Browser" Beeper Safari Finder qBittorrent zoom.us)
 	@for app in $(TEST_APPS); do \
 		pkill -9 "$$app" 2>/dev/null || true; \
 	done
