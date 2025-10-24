@@ -41,7 +41,10 @@ INSTALL_DIR = /var/ammonia/core/tweaks
 CLI_INSTALL_DIR = /usr/local/bin
 
 # Source files
-DYLIB_SOURCES = $(SOURCE_DIR)/sharpener/sharpener.m ZKSwizzle/ZKSwizzle.m
+DYLIB_SOURCES = $(SOURCE_DIR)/sharpener/sharpener.m \
+                $(SOURCE_DIR)/sharpener/Windows/window.m \
+                $(SOURCE_DIR)/sharpener/Dock/dock.m \
+                ZKSwizzle/ZKSwizzle.m
 DYLIB_OBJECTS = $(DYLIB_SOURCES:%.m=$(BUILD_DIR)/%.o)
 
 # CLI tool source and object
@@ -113,18 +116,22 @@ install: $(BUILD_DIR)/$(DYLIB_NAME) $(BUILD_DIR)/$(CLI_NAME) ## Install dylib an
 
 # Test target that builds, installs, and relaunches test applications
 test: install ## Build, install, and restart test applications
-	@echo "Force quitting test applications..."
-	$(eval TEST_APPS := Spotify "System Settings" Chess soffice "Brave Browser" Beeper Safari Finder)
+	@echo "Force quitting test applications and Dock..."
+	$(eval TEST_APPS := Spotify "System Settings" Chess soffice "Brave Browser" Beeper Safari Finder qBittorrent zoom.us)
 	@for app in $(TEST_APPS); do \
 		pkill -9 "$$app" 2>/dev/null || true; \
 	done
+	@echo "Killing Dock to reload with new dylib..."
+	@pkill -9 "Dock" 2>/dev/null || true
 	@echo "Relaunching test applications..."
 	@for app in $(TEST_APPS); do \
-		if [ "$$app" != "soffice" ]; then \
+		if [ "$$app" != "soffice" ] && [ "$$app" != "zoom.us" ]; then \
 			open -a "$$app" 2>/dev/null || true; \
+		elif [ "$$app" = "zoom.us" ]; then \
+			open -a "zoom.us" 2>/dev/null || true; \
 		fi; \
 	done
-	@echo "Test applications restarted with new dylib loaded"
+	@echo "Test applications and Dock restarted with new dylib loaded"
 
 # Clean build files
 clean: ## Remove build directory and artifacts
@@ -133,11 +140,13 @@ clean: ## Remove build directory and artifacts
 
 # Delete installed files
 delete: ## Delete installed files and relaunch Finder
-	@echo "Force quitting test applications..."
-	$(eval TEST_APPS := Spotify "System Settings" Chess soffice "Brave Browser" Beeper Safari Finder)
+	@echo "Force quitting test applications and Dock..."
+	$(eval TEST_APPS := Spotify "System Settings" Chess soffice "Brave Browser" Beeper Safari Finder qBittorrent zoom.us)
 	@for app in $(TEST_APPS); do \
 		pkill -9 "$$app" 2>/dev/null || true; \
 	done
+	@echo "Killing Dock..."
+	@pkill -9 "Dock" 2>/dev/null || true
 	@sleep 2 && open -a "Finder" || true
 	@sudo rm -f $(INSTALL_PATH)
 	@sudo rm -f $(CLI_INSTALL_PATH)

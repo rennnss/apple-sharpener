@@ -12,15 +12,21 @@ sharpener off
 # Toggle
 sharpener toggle
 
-# Set radius
+# Set window radius
 sharpener -r 40
 sharpener --radius=40
 
+# Set dock radius
+sharpener -d 20
+sharpener --dock-radius=20
+
 # Show current settings
 sharpener -s
+sharpener --status
 
 # Show version
 sharpener -v
+sharpener --version
 ```
 
 ## Commands
@@ -31,25 +37,31 @@ sharpener -v
 
 ## Options
 
-- `-r, --radius <value>` — Set the sharpening radius (integer `>= 0`)
-- `--radius=<value>` — Alternative syntax to set radius
-- `-s, --status` — Show current radius and status (`on`/`off`)
+- `-r, --radius <value>` — Set the window sharpening radius (integer `>= 0`)
+- `--radius=<value>` — Alternative syntax to set window radius
+- `-d, --dock-radius <value>` — Set the dock radius (integer `>= 0`)
+- `--dock-radius=<value>` — Alternative syntax to set dock radius
+- `-s, --status` — Show current window radius, dock radius, and status (`on`/`off`)
 - `-v, --version` — Show CLI version
 - `-h, --help` — Show built‑in help
 
 ## Examples
 
 ```bash
-# Set radius to 0 for sharp (square) corners
+# Set window radius to 0 for sharp (square) corners
 sharpener -r 0
 
-# Set radius to 40 and enable immediately
+# Set dock radius to 15
+sharpener -d 15
+
+# Set window radius to 40 and enable immediately
 sharpener on && sharpener -r 40
 
 # Query current status
 sharpener -s
 # Output example:
 # Current radius: 40
+# Current dock radius: 15
 # Status: on
 
 # Show version
