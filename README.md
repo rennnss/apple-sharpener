@@ -16,7 +16,7 @@ View more screenshots: [GALLERY.md](./GALLERY.md)
 - Square corners for application windows with configurable radius (`0` for sharp corners)
 - Live control via CLI: `on`, `off`, `toggle` (no app restart needed)
 - Live radius adjustment via `-r/--radius` with immediate effect across open windows
-- Status query via `-s/--show-radius` (shows current radius and on/off state)
+- Status query via `-s/--status` (shows current radius and on/off state)
 - Persists enabled state and radius across apps via `notifyd` channels
 - Preserves system UI (menus, popovers, HUD/utility windows) by targeting standard app windows only
 - Fullscreen-safe behavior; uses `0` radius in fullscreen to avoid visual artifacts
@@ -81,7 +81,17 @@ Did you follow this [readme](./README.md#requirements) carefully?
 
 ## How It Works
 
-Apple Sharpener uses method swizzling to modify the window corner mask and titlebar decoration view behavior of macOS applications. It specifically targets application windows while preserving the native appearance of menus, popovers, and other system UI elements.
+Apple Sharpener uses method swizzling to modify the window corner mask and titlebar decoration view behavior of macOS applications. 
+
+### Technical Implementation
+
+- **Safe Window Targeting**: Uses notification-based corner radius application to avoid recursion crashes
+- **Intelligent Filtering**: Only targets standard titled windows with minimum size requirements
+- **System UI Preservation**: Excludes context menus, tooltips, HUD windows, and other transient UI elements
+- **Window Level Checking**: Respects macOS window hierarchy to avoid affecting floating panels and system overlays
+- **Lifecycle-Aware**: Applies corner radius when windows become active, ensuring proper initialization
+
+The implementation specifically addresses compatibility issues with complex applications like Zoom while maintaining the native appearance of system UI elements.
 
 ## Contributing
 
