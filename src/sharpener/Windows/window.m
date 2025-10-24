@@ -69,39 +69,37 @@ static void setupWindowNotifications(void) {
     static const char *kNotifyEnabled = "com.aspauldingcode.apple_sharpener.enabled";
     static const char *kNotifyRadius  = "com.aspauldingcode.apple_sharpener.set_radius";
 
-    // Hydrate current state at load
-    {
-        int tokenEnabled = 0;
-        uint64_t enabledState = 1;
-        if (notify_register_check(kNotifyEnabled, &tokenEnabled) == NOTIFY_STATUS_OK) {
-            notify_get_state(tokenEnabled, &enabledState);
-        }
-        enableSharpener = (enabledState != 0);
-    }
-    {
-        int tokenRadius = 0;
-        uint64_t radiusState = 0;
-        if (notify_register_check(kNotifyRadius, &tokenRadius) == NOTIFY_STATUS_OK) {
-            notify_get_state(tokenRadius, &radiusState);
-        }
-        customRadius = (NSInteger)radiusState;
-    }
+    // Load persisted state from NSUserDefaults
+    NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:@"com.aspauldingcode.apple_sharpener"];
+    enableSharpener = [defaults boolForKey:@"enabled"];
+    customRadius = [defaults integerForKey:@"radius"];
+
+    NSLog(@"[AppleSharpener] Windows: Loaded enableSharpener: %d, customRadius: %ld", enableSharpener, (long)customRadius);
 
     toggleSquareCorners(enableSharpener, customRadius);
 
     int tokenEnable = 0;
     notify_register_dispatch("com.aspauldingcode.apple_sharpener.enable", &tokenEnable, queue, ^(int __unused t){
         toggleSquareCorners(YES, customRadius);
+        [defaults setBool:YES forKey:@"enabled"];
+        [defaults setInteger:customRadius forKey:@"radius"];
+        [defaults synchronize];
     });
 
     int tokenDisable = 0;
     notify_register_dispatch("com.aspauldingcode.apple_sharpener.disable", &tokenDisable, queue, ^(int __unused t){
         toggleSquareCorners(NO, customRadius);
+        [defaults setBool:NO forKey:@"enabled"];
+        [defaults setInteger:customRadius forKey:@"radius"];
+        [defaults synchronize];
     });
 
     int tokenToggle = 0;
     notify_register_dispatch("com.aspauldingcode.apple_sharpener.toggle", &tokenToggle, queue, ^(int __unused t){
         toggleSquareCorners(!enableSharpener, customRadius);
+        [defaults setBool:enableSharpener forKey:@"enabled"];
+        [defaults setInteger:customRadius forKey:@"radius"];
+        [defaults synchronize];
     });
 
     int tokenSetRadius = 0;
@@ -110,6 +108,9 @@ static void setupWindowNotifications(void) {
         if (notify_get_state(t, &state) == NOTIFY_STATUS_OK) {
             toggleSquareCorners(enableSharpener, (NSInteger)state);
         }
+        [defaults setBool:enableSharpener forKey:@"enabled"];
+        [defaults setInteger:customRadius forKey:@"radius"];
+        [defaults synchronize];
     });
 }
 

@@ -145,6 +145,11 @@ static void setupDockNotifications(void) {
     
     NSLog(@"[AppleSharpener] Setting up dock notifications in process: %@", [[NSBundle mainBundle] bundleIdentifier]);
     
+    // Load persisted settings from NSUserDefaults
+    NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:@"com.aspauldingcode.apple_sharpener"];
+    enableDockSharpener = [defaults boolForKey:@"enabled"];
+    dockCustomRadius = [defaults integerForKey:@"dock_radius"];
+    
     // Hook CALayer's layoutSublayers method
     Class layerClass = [CALayer class];
     Method originalMethod = class_getInstanceMethod(layerClass, @selector(layoutSublayers));
@@ -176,44 +181,32 @@ static void setupDockNotifications(void) {
     static const char *kNotifyEnabled = "com.aspauldingcode.apple_sharpener.enabled";
     static const char *kNotifyDockRadius = "com.aspauldingcode.apple_sharpener.dock.set_radius";
     
-    // Hydrate current state from universal enabled notification
-    {
-        int tokenEnabled = 0;
-        uint64_t enabledState = 1;
-        if (notify_register_check(kNotifyEnabled, &tokenEnabled) == NOTIFY_STATUS_OK) {
-            notify_get_state(tokenEnabled, &enabledState);
-        }
-        enableDockSharpener = (enabledState != 0);
-        ASDebugLog("Hydrated enabled=%d", enableDockSharpener);
-    }
-    {
-        int tokenRadius = 0;
-        uint64_t radiusState = 0;
-        if (notify_register_check(kNotifyDockRadius, &tokenRadius) == NOTIFY_STATUS_OK) {
-            notify_get_state(tokenRadius, &radiusState);
-        }
-        dockCustomRadius = (NSInteger)radiusState;
-        ASDebugLog("Hydrated dock radius=%ld", (long)dockCustomRadius);
+    int tokenEnabled;
+    if (notify_register_dispatch(kNotifyEnabled, &tokenEnabled, dispatch_get_main_queue(), ^(int token) {
+        uint64_t state;
+        notify_get_state(token, &state);
+        enableDockSharpener = (state != 0);
+        [defaults setBool:enableDockSharpener forKey:@"enabled"];
+        [defaults synchronize];
+        toggleDockCorners(enableDockSharpener, dockCustomRadius);
+        ASDebugLog("Updated enabled=%d", enableDockSharpener);
+    }) != NOTIFY_STATUS_OK) {
+        ASDebugLog("Failed to register for enabled notification");
     }
     
+    int tokenRadius;
+    if (notify_register_dispatch(kNotifyDockRadius, &tokenRadius, dispatch_get_main_queue(), ^(int token) {
+        uint64_t state;
+        notify_get_state(token, &state);
+        dockCustomRadius = (NSInteger)state;
+        [defaults setInteger:dockCustomRadius forKey:@"dock_radius"];
+        [defaults synchronize];
+        toggleDockCorners(enableDockSharpener, dockCustomRadius);
+        ASDebugLog("Updated dock radius=%ld", (long)dockCustomRadius);
+    }) != NOTIFY_STATUS_OK) {
+        ASDebugLog("Failed to register for dock radius notification");
+    }
+    
+    // Initial application
     toggleDockCorners(enableDockSharpener, dockCustomRadius);
-    
-    // Register notification handlers for universal enable/disable
-    int tokenEnabled = 0;
-    notify_register_dispatch(kNotifyEnabled, &tokenEnabled, queue, ^(int t){
-        uint64_t state = 0;
-        if (notify_get_state(t, &state) == NOTIFY_STATUS_OK) {
-            ASDebugLog("Notify enabled state=%llu", state);
-            toggleDockCorners((state != 0), dockCustomRadius);
-        }
-    });
-    
-    int tokenSetRadius = 0;
-    notify_register_dispatch(kNotifyDockRadius, &tokenSetRadius, queue, ^(int t){
-        uint64_t state = 0;
-        if (notify_get_state(t, &state) == NOTIFY_STATUS_OK) {
-            ASDebugLog("Notify dock radius=%llu", state);
-            toggleDockCorners(enableDockSharpener, (NSInteger)state);
-        }
-    });
 }

@@ -45,6 +45,9 @@ int main(int argc, const char * argv[]) {
                 notify_set_state(tokenEnabled, 1);
                 notify_post("com.aspauldingcode.apple_sharpener.enabled");
             }
+            NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:@"com.aspauldingcode.apple_sharpener"];
+            [defaults setBool:YES forKey:@"enabled"];
+            [defaults synchronize];
             printf("Sharpener enabled\n");
         } else if ([firstArg isEqualToString:@"off"]) {
             // Backward-compatible event
@@ -55,6 +58,9 @@ int main(int argc, const char * argv[]) {
                 notify_set_state(tokenEnabled, 0);
                 notify_post("com.aspauldingcode.apple_sharpener.enabled");
             }
+            NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:@"com.aspauldingcode.apple_sharpener"];
+            [defaults setBool:NO forKey:@"enabled"];
+            [defaults synchronize];
             printf("Sharpener disabled\n");
         } else if ([firstArg isEqualToString:@"toggle"]) {
             // Backward-compatible event
@@ -68,6 +74,10 @@ int main(int argc, const char * argv[]) {
                 notify_set_state(tokenEnabled, newState);
                 notify_post("com.aspauldingcode.apple_sharpener.enabled");
             }
+            NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:@"com.aspauldingcode.apple_sharpener"];
+            BOOL currentEnabled = [defaults boolForKey:@"enabled"];
+            [defaults setBool:!currentEnabled forKey:@"enabled"];
+            [defaults synchronize];
             printf("Sharpener toggled\n");
         } else if ([firstArg hasPrefix:@"--radius="] || ([firstArg isEqualToString:@"-r"] && argc > 2)) {
             uint64_t radius = 0;
@@ -82,6 +92,9 @@ int main(int argc, const char * argv[]) {
                 // Set the state with the token and post the notification.
                 notify_set_state(tokenSetRadius, radius);
                 notify_post("com.aspauldingcode.apple_sharpener.set_radius");
+                NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:@"com.aspauldingcode.apple_sharpener"];
+                [defaults setInteger:radius forKey:@"radius"];
+                [defaults synchronize];
                 printf("Sharpener radius set to %llu\n", radius);
             } else {
                 printf("Failed to register set_radius notification\n");
@@ -100,6 +113,9 @@ int main(int argc, const char * argv[]) {
             if (notify_register_check("com.aspauldingcode.apple_sharpener.dock.set_radius", &tokenSetRadius) == NOTIFY_STATUS_OK) {
                 notify_set_state(tokenSetRadius, radius);
                 notify_post("com.aspauldingcode.apple_sharpener.dock.set_radius");
+                NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:@"com.aspauldingcode.apple_sharpener"];
+                [defaults setInteger:radius forKey:@"dock_radius"];
+                [defaults synchronize];
                 printf("Dock radius set to %llu\n", radius);
             } else {
                 printf("Failed to register dock set_radius notification\n");
@@ -144,7 +160,9 @@ int main(int argc, const char * argv[]) {
                 printf("Failed to register enabled notification for reading\n");
                 return 1;
             }
-
+            NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:@"com.aspauldingcode.apple_sharpener"];
+            BOOL persistedEnabled = [defaults boolForKey:@"enabled"];
+            enabledState = persistedEnabled ? 1 : 0;  // Use persisted value if needed
             printf("Current radius: %llu\n", currentRadius);
             printf("Current dock radius: %llu\n", currentDockRadius);
             printf("Status: %s\n", enabledState ? "on" : "off");
