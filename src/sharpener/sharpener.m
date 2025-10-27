@@ -19,13 +19,30 @@ static NSImage *_cachedSquareCornerMask = nil;
 
 #pragma mark - Helper Functions
 
-// Check if a window is a standard application window.
+// Check if a window should have sharp corners applied.
+// Excludes alert panels, modal dialogs, and special system windows.
 // Inlined for performance since it's called frequently
 static inline BOOL isStandardAppWindow(NSWindow *window) {
     if (!window) return NO;
+    
+    // Exclude NSPanel subclasses (alerts, modals, etc.)
+    if ([window isKindOfClass:NSClassFromString(@"NSPanel")]) {
+        return NO;
+    }
+    
+    // Exclude windows with utility or HUD style (popovers, tooltips, etc.)
     NSWindowStyleMask mask = window.styleMask;
-    return ((mask & NSWindowStyleMaskTitled) &&
-            !(mask & (NSWindowStyleMaskHUDWindow | NSWindowStyleMaskUtilityWindow)));
+    if (mask & (NSWindowStyleMaskUtilityWindow | NSWindowStyleMaskHUDWindow)) {
+        return NO;
+    }
+    
+    // Exclude windows that are modal sheets
+    if (window.sheet || window.sheetParent) {
+        return NO;
+    }
+    
+    // Apply only to titled windows
+    return (mask & NSWindowStyleMaskTitled) != 0;
 }
 
 // Apply the desired corner radius to a given window.
@@ -84,19 +101,19 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
 @implementation AS_NSWindow_CornerRadius
 
 - (id)_cornerMask {
-    if (!enableSharpener || !enableCustomRadius)
-        return ZKOrig(id);
-    
-    // When customRadius is 0 we return a cached 1x1 white image mask for square corners.
-    if (customRadius == 0 && isStandardAppWindow(self)) {
-        if (!_cachedSquareCornerMask) {
-            _cachedSquareCornerMask = [[NSImage alloc] initWithSize:NSMakeSize(1, 1)];
-            [_cachedSquareCornerMask lockFocus];
-            [[NSColor whiteColor] set];
-            NSRectFill(NSMakeRect(0, 0, 1, 1));
-            [_cachedSquareCornerMask unlockFocus];
+    // Apply to all titled windows when sharpener is enabled
+    if (enableSharpener && enableCustomRadius && isStandardAppWindow(self)) {
+        if (customRadius == 0) {
+            // Return a 1x1 white image mask for completely square corners
+            if (!_cachedSquareCornerMask) {
+                _cachedSquareCornerMask = [[NSImage alloc] initWithSize:NSMakeSize(1, 1)];
+                [_cachedSquareCornerMask lockFocus];
+                [[NSColor whiteColor] set];
+                NSRectFill(NSMakeRect(0, 0, 1, 1));
+                [_cachedSquareCornerMask unlockFocus];
+            }
+            return _cachedSquareCornerMask;
         }
-        return _cachedSquareCornerMask;
     }
     return ZKOrig(id);
 }
@@ -140,10 +157,27 @@ ZKSwizzleInterface(AS_NSWindow_CornerRadius, NSWindow, NSWindow)
 
 - (id)initWithContentRect:(NSRect)contentRect styleMask:(NSWindowStyleMask)style backing:(NSBackingStoreType)backingStoreType defer:(BOOL)flag {
     id result = ZKOrig(id, contentRect, style, backingStoreType, flag);
-    if (result && enableSharpener && enableCustomRadius) {
+    if (result && enableSharpener && enableCustomRadius && isStandardAppWindow((NSWindow *)result)) {
         applyCornerRadiusToWindow((NSWindow *)result);
+        // Force corner mask update
+        [(NSWindow *)result setBackgroundColor:[(NSWindow *)result backgroundColor]];
+        [(NSWindow *)result display];
     }
     return result;
+}
+
+- (void)orderFront:(id)sender {
+    ZKOrig(void, sender);
+    if (enableSharpener && enableCustomRadius && isStandardAppWindow(self)) {
+        applyCornerRadiusToWindow(self);
+    }
+}
+
+- (void)orderWindow:(NSWindowOrderingMode)place relativeTo:(NSInteger)otherWin {
+    ZKOrig(void, place, otherWin);
+    if (enableSharpener && enableCustomRadius && isStandardAppWindow(self)) {
+        applyCornerRadiusToWindow(self);
+    }
 }
 
 @end
